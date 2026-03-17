@@ -19,6 +19,18 @@ class AuthRepositoryImpl implements AuthRepository {
   bool get isAuthenticated => _currentUser != null;
 
   @override
+  Future<void> sendOtp(String phone) async {
+    if (!_remote.isConfigured) return;
+    await _remote.sendOtp(phone);
+  }
+
+  @override
+  Future<void> verifyOtp(String phone, String otp) async {
+    if (!_remote.isConfigured) return;
+    await _remote.verifyOtp(phone: phone, otp: otp);
+  }
+
+  @override
   Future<void> restoreSession() async {
     // API session: token + user json stored after login/register
     final token = _prefs.getString(AppConstants.sessionTokenKey);

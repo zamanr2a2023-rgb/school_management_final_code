@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:high_school/core/constants/app_constants.dart';
 import 'package:high_school/core/network/api_response_helper.dart';
 import 'package:high_school/domain/entities/assignment_detail_result.dart';
@@ -18,6 +19,49 @@ class StudentAssignmentDetailsRemoteDatasource {
       _baseUrl.endsWith('/') ? '${_baseUrl}api/v1' : '$_baseUrl/api/v1';
 
   bool get isConfigured => _baseUrl.isNotEmpty;
+
+  /// POST /submission/:assignmentId/submit (Student, multipart/form-data).
+  /// Sends the student's submission (optional text answer and optional file).
+  Future<bool> submitAssignment({
+    required String assignmentId,
+    String? textAnswer,
+    String? filePath,
+  }) async {
+    if (!isConfigured) return false;
+    final token = _prefs.getString(AppConstants.sessionTokenKey);
+    if (token == null || token.isEmpty) return false;
+
+    final uri = Uri.parse('$_apiBase/submission/$assignmentId/submit');
+    final request = http.MultipartRequest('POST', uri);
+    request.headers['Authorization'] = 'Bearer $token';
+    if (textAnswer != null && textAnswer.trim().isNotEmpty) {
+      request.fields['textAnswer'] = textAnswer.trim();
+    }
+    if (filePath != null && filePath.isNotEmpty) {
+      final file = File(filePath);
+      if (await file.exists()) {
+        request.files.add(
+          await http.MultipartFile.fromPath('file', file.path),
+        );
+      }
+    }
+
+    final streamed = await request.send();
+    final response = await http.Response.fromStream(streamed);
+    if (response.statusCode != 200 && response.statusCode != 201) {
+      return false;
+    }
+    try {
+      final decoded = jsonDecode(response.body) as Map<String, dynamic>?;
+      ensureAuthorized(decoded);
+      final success = decoded?['success'] == true;
+      return success;
+    } on UnauthorizedApiException {
+      return false;
+    } catch (_) {
+      return false;
+    }
+  }
 
   /// GET /assignments/:assignmentId (Student). Returns null if not configured, unauthorized, or error.
   Future<AssignmentDetailResult?> getAssignmentDetail(String assignmentId) async {

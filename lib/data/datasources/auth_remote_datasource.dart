@@ -21,6 +21,47 @@ class AuthRemoteDatasource {
 
   bool get isConfigured => _baseUrl.isNotEmpty;
 
+  /// POST /otp/send
+  /// Body: { "phone": "33445566" }
+  Future<void> sendOtp(String phone) async {
+    final uri = Uri.parse('$_apiBase/otp/send');
+    final response = await http.post(
+      uri,
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({'phone': phone}),
+    );
+    final decoded = jsonDecode(response.body) as Map<String, dynamic>?;
+    if (decoded == null) throw AuthApiException('Invalid response');
+    final status = decoded['status'] as String?;
+    final success = decoded['success'] as bool?;
+    if (status == 'fail' || success == false) {
+      final message = decoded['message'] as String? ?? 'Failed to send OTP';
+      throw AuthApiException(message);
+    }
+  }
+
+  /// POST /otp/verify
+  /// Body: { "phone": "33445566", "otp": "4821" }
+  Future<void> verifyOtp({
+    required String phone,
+    required String otp,
+  }) async {
+    final uri = Uri.parse('$_apiBase/otp/verify');
+    final response = await http.post(
+      uri,
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({'phone': phone, 'otp': otp}),
+    );
+    final decoded = jsonDecode(response.body) as Map<String, dynamic>?;
+    if (decoded == null) throw AuthApiException('Invalid response');
+    final status = decoded['status'] as String?;
+    final success = decoded['success'] as bool?;
+    if (status == 'fail' || success == false) {
+      final message = decoded['message'] as String? ?? 'Invalid OTP';
+      throw AuthApiException(message);
+    }
+  }
+
   /// POST /auth/login
   /// Body: { "phone": "...", "pin": "1234" }
   Future<AuthApiResponse> login(String phone, String pin) async {

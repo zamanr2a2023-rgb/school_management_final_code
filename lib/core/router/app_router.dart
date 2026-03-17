@@ -1,4 +1,3 @@
-import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:high_school/core/constants/app_constants.dart';
@@ -9,6 +8,8 @@ import 'package:high_school/presentation/providers/auth_provider.dart';
 import 'package:high_school/presentation/screens/auth/language_selection_screen.dart';
 import 'package:high_school/presentation/screens/auth/login_screen.dart';
 import 'package:high_school/presentation/screens/auth/register_screen.dart';
+import 'package:high_school/presentation/screens/auth/otp_send_screen.dart';
+import 'package:high_school/presentation/screens/auth/otp_verify_screen.dart';
 import 'package:high_school/presentation/screens/student/student_dashboard_screen.dart';
 import 'package:high_school/presentation/screens/student/classes_list_screen.dart';
 import 'package:high_school/presentation/screens/student/class_details_screen.dart';
@@ -81,6 +82,20 @@ class AppRouter {
         GoRoute(path: '/language', builder: (_, __) => const LanguageSelectionScreen()),
         GoRoute(path: '/login', builder: (_, __) => const LoginScreen()),
         GoRoute(path: '/register', builder: (_, __) => const RegisterScreen()),
+        GoRoute(
+          path: '/otp/send',
+          builder: (_, state) {
+            final phone = state.extra is String ? state.extra as String : '';
+            return OtpSendScreen(phone: phone);
+          },
+        ),
+        GoRoute(
+          path: '/otp/verify',
+          builder: (_, state) {
+            final phone = state.extra is String ? state.extra as String : '';
+            return OtpVerifyScreen(phone: phone);
+          },
+        ),
         GoRoute(
           path: '/sitemap',
           builder: (_, __) => const LayoutWidget(child: SitemapScreen()),

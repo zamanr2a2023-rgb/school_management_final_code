@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import 'package:high_school/core/theme/app_theme.dart';
 import 'package:high_school/domain/entities/assignment_detail_result.dart';
@@ -51,7 +52,9 @@ class AssignmentDetailsScreen extends StatefulWidget {
 class _AssignmentDetailsScreenState extends State<AssignmentDetailsScreen> {
   String _submissionText = '';
   String? _selectedFileName;
+  String? _selectedFilePath;
   bool _submitted = false;
+  final ImagePicker _picker = ImagePicker();
 
   int _daysUntilDue(String dueDateStr) {
     try {
@@ -77,6 +80,26 @@ class _AssignmentDetailsScreenState extends State<AssignmentDetailsScreen> {
       }
     } catch (_) {}
     return dateStr;
+  }
+
+  Future<void> _pickFileFromGallery() async {
+    final XFile? picked = await _picker.pickImage(source: ImageSource.gallery);
+    if (picked != null) {
+      setState(() {
+        _selectedFileName = picked.name;
+        _selectedFilePath = picked.path;
+      });
+    }
+  }
+
+  Future<void> _pickFileFromCamera() async {
+    final XFile? picked = await _picker.pickImage(source: ImageSource.camera);
+    if (picked != null) {
+      setState(() {
+        _selectedFileName = picked.name;
+        _selectedFilePath = picked.path;
+      });
+    }
   }
 
   @override
@@ -514,8 +537,49 @@ class _AssignmentDetailsScreenState extends State<AssignmentDetailsScreen> {
                 Text(lang.t('assignments.uploadFile'), style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.grey.shade700)),
                 const SizedBox(height: 8),
                 InkWell(
-                  onTap: () {
-                    setState(() => _selectedFileName = _selectedFileName == null ? 'document.pdf' : null);
+                  onTap: () async {
+                    await showModalBottomSheet<void>(
+                      context: context,
+                      shape: const RoundedRectangleBorder(
+                        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+                      ),
+                      builder: (ctx) {
+                        return SafeArea(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              ListTile(
+                                leading: const Icon(Icons.photo_library),
+                                title: const Text('Choose from gallery'),
+                                onTap: () async {
+                                  Navigator.of(ctx).pop();
+                                  await _pickFileFromGallery();
+                                },
+                              ),
+                              ListTile(
+                                leading: const Icon(Icons.photo_camera),
+                                title: const Text('Take a photo'),
+                                onTap: () async {
+                                  Navigator.of(ctx).pop();
+                                  await _pickFileFromCamera();
+                                },
+                              ),
+                              if (_selectedFileName != null) ListTile(
+                                leading: const Icon(Icons.delete_outline),
+                                title: const Text('Remove file'),
+                                onTap: () {
+                                  Navigator.of(ctx).pop();
+                                  setState(() {
+                                    _selectedFileName = null;
+                                    _selectedFilePath = null;
+                                  });
+                                },
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    );
                   },
                   borderRadius: BorderRadius.circular(8),
                   child: Container(
@@ -547,7 +611,10 @@ class _AssignmentDetailsScreenState extends State<AssignmentDetailsScreen> {
                         Expanded(child: Text(_selectedFileName!, style: TextStyle(fontSize: 12, color: Colors.blue.shade900), maxLines: 1, overflow: TextOverflow.ellipsis)),
                         IconButton(
                           icon: Icon(Icons.close, size: 18, color: Colors.blue.shade700),
-                          onPressed: () => setState(() => _selectedFileName = null),
+                          onPressed: () => setState(() {
+                            _selectedFileName = null;
+                            _selectedFilePath = null;
+                          }),
                           padding: EdgeInsets.zero,
                           constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
                         ),
@@ -581,9 +648,20 @@ class _AssignmentDetailsScreenState extends State<AssignmentDetailsScreen> {
                   height: 48,
                   child: ElevatedButton.icon(
                     onPressed: canSubmit
-                        ? () {
-                            setState(() => _submitted = true);
-                            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(lang.t('assignments.submitted'))));
+                        ? () async {
+                            final repo = context.read<StudentAssignmentDetailsRepository>();
+                            final ok = await repo.submitAssignment(
+                              widget.assignmentId,
+                              textAnswer: _submissionText.trim().isEmpty ? null : _submissionText.trim(),
+                              filePath: _selectedFilePath,
+                            );
+                            if (!mounted) return;
+                            if (ok) {
+                              setState(() => _submitted = true);
+                              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(lang.t('assignments.submitted'))));
+                            } else {
+                              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(lang.t('assignments.submitFailed'))));
+                            }
                           }
                         : null,
                     icon: const Icon(Icons.upload, size: 18),

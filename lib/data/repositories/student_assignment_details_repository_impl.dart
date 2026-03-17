@@ -13,4 +13,16 @@ class StudentAssignmentDetailsRepositoryImpl
   @override
   Future<AssignmentDetailResult?> getAssignmentDetail(String assignmentId) =>
       _remote.getAssignmentDetail(assignmentId);
+
+  @override
+  Future<bool> submitAssignment(
+    String assignmentId, {
+    String? textAnswer,
+    String? filePath,
+  }) =>
+      _remote.submitAssignment(
+        assignmentId: assignmentId,
+        textAnswer: textAnswer,
+        filePath: filePath,
+      );
 }

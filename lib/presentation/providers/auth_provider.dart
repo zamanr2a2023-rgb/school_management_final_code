@@ -20,6 +20,32 @@ class AuthProvider with ChangeNotifier {
     notifyListeners();
   }
 
+  Future<bool> sendOtp(String phone) async {
+    lastAuthError = null;
+    try {
+      await _authRepository.sendOtp(phone);
+      notifyListeners();
+      return true;
+    } on AuthApiException catch (e) {
+      lastAuthError = e.message;
+      notifyListeners();
+      return false;
+    }
+  }
+
+  Future<bool> verifyOtp(String phone, String otp) async {
+    lastAuthError = null;
+    try {
+      await _authRepository.verifyOtp(phone, otp);
+      notifyListeners();
+      return true;
+    } on AuthApiException catch (e) {
+      lastAuthError = e.message;
+      notifyListeners();
+      return false;
+    }
+  }
+
   Future<bool> login(String emailOrPhone, String password) async {
     lastAuthError = null;
     try {

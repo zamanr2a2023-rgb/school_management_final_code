@@ -200,7 +200,7 @@ class _RegisterBodyState extends State<_RegisterBody> {
       _success = ok;
     });
     if (ok && _role == 'student') {
-      context.go('/student/dashboard');
+      context.go('/otp/send', extra: _phoneController.text.trim());
     } else if (ok && _role == 'teacher') {
       // Teacher pending - stay on success message
     } else if (!ok) {
