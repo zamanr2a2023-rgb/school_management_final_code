@@ -38,14 +38,17 @@ import 'package:shared_preferences/shared_preferences.dart';
 class AppRouter {
   static Future<GoRouter> createRouter() async {
     final prefs = await SharedPreferences.getInstance();
-    final languageSelected = prefs.getBool(AppConstants.languageSelectedKey) ?? false;
+    final languageSelected =
+        prefs.getBool(AppConstants.languageSelectedKey) ?? false;
     final sessionUserId = prefs.getString(AppConstants.sessionUserIdKey);
     final sessionRole = prefs.getString(AppConstants.sessionRoleKey);
 
     String initialLocation = '/language';
     if (languageSelected) {
       if (sessionUserId != null) {
-        initialLocation = sessionRole == 'teacher' ? '/teacher/dashboard' : '/student/dashboard';
+        initialLocation = sessionRole == 'teacher'
+            ? '/teacher/dashboard'
+            : '/student/dashboard';
       } else {
         initialLocation = '/login';
       }
@@ -55,7 +58,8 @@ class AppRouter {
       initialLocation: initialLocation,
       redirect: (context, state) async {
         final prefs = await SharedPreferences.getInstance();
-        final languageSelected = prefs.getBool(AppConstants.languageSelectedKey) ?? false;
+        final languageSelected =
+            prefs.getBool(AppConstants.languageSelectedKey) ?? false;
         final auth = context.read<AuthProvider>();
         final isAuthenticated = auth.isAuthenticated;
         final user = auth.user;
@@ -65,7 +69,10 @@ class AppRouter {
         final isRegister = loc == '/register';
 
         if (!languageSelected && !isLanguage) return '/language';
-        if (languageSelected && !isAuthenticated && !isLogin && !isRegister &&
+        if (languageSelected &&
+            !isAuthenticated &&
+            !isLogin &&
+            !isRegister &&
             !loc.startsWith('/sitemap')) return '/login';
         if (isAuthenticated && (isLogin || isRegister || isLanguage)) {
           if (user?.role == UserRole.student) return '/student/dashboard';
@@ -73,13 +80,17 @@ class AppRouter {
           return '/login';
         }
         if (isAuthenticated && user != null) {
-          if (loc.startsWith('/student/') && user.role != UserRole.student) return '/teacher/dashboard';
-          if (loc.startsWith('/teacher/') && user.role != UserRole.teacher) return '/student/dashboard';
+          if (loc.startsWith('/student/') && user.role != UserRole.student)
+            return '/teacher/dashboard';
+          if (loc.startsWith('/teacher/') && user.role != UserRole.teacher)
+            return '/student/dashboard';
         }
         return null;
       },
       routes: [
-        GoRoute(path: '/language', builder: (_, __) => const LanguageSelectionScreen()),
+        GoRoute(
+            path: '/language',
+            builder: (_, __) => const LanguageSelectionScreen()),
         GoRoute(path: '/login', builder: (_, __) => const LoginScreen()),
         GoRoute(path: '/register', builder: (_, __) => const RegisterScreen()),
         GoRoute(
@@ -107,7 +118,8 @@ class AppRouter {
         // Student
         GoRoute(
           path: '/student/dashboard',
-          builder: (_, __) => const LayoutWidget(child: StudentDashboardScreen()),
+          builder: (_, __) =>
+              const LayoutWidget(child: StudentDashboardScreen()),
         ),
         GoRoute(
           path: '/student/classes',
@@ -116,18 +128,21 @@ class AppRouter {
         GoRoute(
           path: '/student/classes/:classId',
           builder: (_, state) => LayoutWidget(
-            child: ClassDetailsScreen(classId: state.pathParameters['classId']!),
+            child:
+                ClassDetailsScreen(classId: state.pathParameters['classId']!),
           ),
         ),
         GoRoute(
           path: '/student/lessons/:lessonId',
           builder: (_, state) => LayoutWidget(
-            child: LessonDetailsScreen(lessonId: state.pathParameters['lessonId']!),
+            child: LessonDetailsScreen(
+                lessonId: state.pathParameters['lessonId']!),
           ),
         ),
         GoRoute(
           path: '/student/assignments',
-          builder: (_, __) => const LayoutWidget(child: AssignmentsListScreen()),
+          builder: (_, __) =>
+              const LayoutWidget(child: AssignmentsListScreen()),
         ),
         GoRoute(
           path: '/student/assignments/:assignmentId',
@@ -178,32 +193,38 @@ class AppRouter {
         // Teacher
         GoRoute(
           path: '/teacher/dashboard',
-          builder: (_, __) => const LayoutWidget(child: TeacherDashboardScreen()),
+          builder: (_, __) =>
+              const LayoutWidget(child: TeacherDashboardScreen()),
         ),
         GoRoute(
           path: '/teacher/classes',
-          builder: (_, __) => const LayoutWidget(child: TeacherClassesListScreen()),
+          builder: (_, __) =>
+              const LayoutWidget(child: TeacherClassesListScreen()),
         ),
         GoRoute(
           path: '/teacher/classes/:classId',
           builder: (_, state) => LayoutWidget(
-            child: TeacherClassDetailsScreen(classId: state.pathParameters['classId']!),
+            child: TeacherClassDetailsScreen(
+                classId: state.pathParameters['classId']!),
           ),
         ),
         GoRoute(
           path: '/teacher/assignments/:assignmentId',
           builder: (_, state) => LayoutWidget(
-            child: TeacherAssignmentDetailsScreen(assignmentId: state.pathParameters['assignmentId']!),
+            child: TeacherAssignmentDetailsScreen(
+                assignmentId: state.pathParameters['assignmentId']!),
           ),
         ),
         GoRoute(
           path: '/teacher/students',
-          builder: (_, __) => const LayoutWidget(child: TeacherStudentsListScreen()),
+          builder: (_, __) =>
+              const LayoutWidget(child: TeacherStudentsListScreen()),
         ),
         GoRoute(
           path: '/teacher/students/:studentId',
           builder: (_, state) => LayoutWidget(
-            child: TeacherStudentDetailScreen(studentId: state.pathParameters['studentId']!),
+            child: TeacherStudentDetailScreen(
+                studentId: state.pathParameters['studentId']!),
           ),
         ),
         GoRoute(
@@ -212,11 +233,13 @@ class AppRouter {
         ),
         GoRoute(
           path: '/teacher/live-sessions',
-          builder: (_, __) => const LayoutWidget(child: TeacherLiveSessionsScreen()),
+          builder: (_, __) =>
+              const LayoutWidget(child: TeacherLiveSessionsScreen()),
         ),
         GoRoute(
           path: '/teacher/analytics',
-          builder: (_, __) => const LayoutWidget(child: TeacherAnalyticsScreen()),
+          builder: (_, __) =>
+              const LayoutWidget(child: TeacherAnalyticsScreen()),
         ),
         GoRoute(
           path: '/teacher/profile',
