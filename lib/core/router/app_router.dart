@@ -4,6 +4,7 @@ import 'package:high_school/core/constants/app_constants.dart';
 import 'package:high_school/domain/entities/user_entity.dart';
 import 'package:high_school/domain/entities/live_session_entity.dart';
 import 'package:high_school/domain/entities/assignment_entity.dart';
+import 'package:high_school/domain/entities/class_entity.dart';
 import 'package:high_school/presentation/providers/auth_provider.dart';
 import 'package:high_school/presentation/screens/auth/language_selection_screen.dart';
 import 'package:high_school/presentation/screens/auth/login_screen.dart';
@@ -128,8 +129,10 @@ class AppRouter {
         GoRoute(
           path: '/student/classes/:classId',
           builder: (_, state) => LayoutWidget(
-            child:
-                ClassDetailsScreen(classId: state.pathParameters['classId']!),
+            child: ClassDetailsScreen(
+              classId: state.pathParameters['classId']!,
+              passedClass: state.extra is ClassEntity ? state.extra as ClassEntity : null,
+            ),
           ),
         ),
         GoRoute(

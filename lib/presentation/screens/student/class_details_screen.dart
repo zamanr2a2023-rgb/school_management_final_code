@@ -11,9 +11,15 @@ import 'package:high_school/domain/repositories/lessons_repository.dart';
 import 'package:high_school/presentation/providers/language_provider.dart';
 
 class ClassDetailsScreen extends StatelessWidget {
-  const ClassDetailsScreen({super.key, required this.classId});
+  const ClassDetailsScreen({
+    super.key,
+    required this.classId,
+    this.passedClass,
+  });
 
   final String classId;
+  /// When provided (e.g. navigated from classes list API), use this instead of fetching by id.
+  final ClassEntity? passedClass;
 
   static Color _colorFromHex(String hex) {
     final s = hex.replaceFirst('#', '');
@@ -26,7 +32,7 @@ class ClassDetailsScreen extends StatelessWidget {
 
     return FutureBuilder(
       future: Future.wait([
-        context.read<ClassesRepository>().getClassById(classId),
+        passedClass != null ? Future<ClassEntity?>.value(passedClass) : context.read<ClassesRepository>().getClassById(classId),
         context.read<LessonsRepository>().getLessons(classId: classId),
         context.read<AssignmentsRepository>().getAssignments(classId: classId),
       ]),
