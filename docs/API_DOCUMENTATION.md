@@ -35,6 +35,9 @@ A Postman collection with **all endpoints** from this document is available as:
   - **Classes**
     - `GET /students/student/classes` (Student)
     - `GET /classes/student/my` (Student)
+    - 'GET /classes/student/:classId' (Student) // Singel classs  
+    
+
   - **Timetable**
     - `GET /students/timetable` (Student)
   - **Live Sessions**

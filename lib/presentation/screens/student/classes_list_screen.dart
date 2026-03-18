@@ -38,58 +38,59 @@ class ClassesListScreen extends StatelessWidget {
             children: [
               // Header banner – dark blue, rounded corners, subtle shadow (match image 1)
               Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
-              decoration: BoxDecoration(
-                color: const Color(0xFF1E3A8A),
-                borderRadius: BorderRadius.circular(12),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.12),
-                    blurRadius: 8,
-                    offset: const Offset(0, 3),
-                  ),
-                ],
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    lang.t('classes.myClasses'),
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: 0,
-                      decoration: TextDecoration.none,
+                width: double.infinity,
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF1E3A8A),
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.12),
+                      blurRadius: 8,
+                      offset: const Offset(0, 3),
                     ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    lang.t('classes.enrolledClasses'),
-                    style: const TextStyle(
-                      color: Color(0xFFBFDBFE),
-                      fontSize: 14,
-                      fontWeight: FontWeight.normal,
-                      letterSpacing: 0,
-                      decoration: TextDecoration.none,
+                  ],
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      lang.t('classes.myClasses'),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 0,
+                        decoration: TextDecoration.none,
+                      ),
                     ),
-                  ),
-                ],
+                    const SizedBox(height: 4),
+                    Text(
+                      lang.t('classes.enrolledClasses'),
+                      style: const TextStyle(
+                        color: Color(0xFFBFDBFE),
+                        fontSize: 14,
+                        fontWeight: FontWeight.normal,
+                        letterSpacing: 0,
+                        decoration: TextDecoration.none,
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
-            const SizedBox(height: 16),
-            if (isEmpty)
-              _EmptyState(lang: lang)
-            else
-              ...grouped.entries.map((e) => _SubjectCard(
-                    subject: e.key,
-                    classes: e.value,
-                    lang: lang,
-                  )),
-            const SizedBox(height: 24),
-          ],
+              const SizedBox(height: 16),
+              if (isEmpty)
+                _EmptyState(lang: lang)
+              else
+                ...grouped.entries.map((e) => _SubjectCard(
+                      subject: e.key,
+                      classes: e.value,
+                      lang: lang,
+                    )),
+              const SizedBox(height: 24),
+            ],
           ),
         );
       },
@@ -121,7 +122,8 @@ class _EmptyState extends StatelessWidget {
           color: Colors.white,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
-            side: BorderSide(color: AppTheme.primary.withValues(alpha: 0.2), width: 1),
+            side: BorderSide(
+                color: AppTheme.primary.withValues(alpha: 0.2), width: 1),
           ),
           child: Padding(
             padding: const EdgeInsets.all(32),
@@ -191,7 +193,8 @@ class _SubjectCard extends StatelessWidget {
       clipBehavior: Clip.antiAlias,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
-        side: BorderSide(color: AppTheme.primary.withValues(alpha: 0.2), width: 2),
+        side: BorderSide(
+            color: AppTheme.primary.withValues(alpha: 0.2), width: 2),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -232,7 +235,9 @@ class _SubjectCard extends StatelessWidget {
                   children: [
                     Icon(Icons.menu_book, size: 14, color: AppTheme.primary),
                     const SizedBox(width: 6),
-                    Text(first.teacher, style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
+                    Text(first.teacher,
+                        style: TextStyle(
+                            fontSize: 12, color: Colors.grey.shade600)),
                   ],
                 ),
                 const SizedBox(height: 6),
@@ -242,7 +247,8 @@ class _SubjectCard extends StatelessWidget {
                     const SizedBox(width: 6),
                     Text(
                       '$totalStudents ${lang.t('classes.students')}',
-                      style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                      style:
+                          TextStyle(fontSize: 12, color: Colors.grey.shade600),
                     ),
                   ],
                 ),
@@ -250,15 +256,21 @@ class _SubjectCard extends StatelessWidget {
                 Wrap(
                   spacing: 6,
                   runSpacing: 6,
-                  children: allGrades.map((level) => Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: AppTheme.primary.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(6),
-                      border: Border.all(color: AppTheme.primary.withValues(alpha: 0.2)),
-                    ),
-                    child: Text(level, style: const TextStyle(fontSize: 10)),
-                  )).toList(),
+                  children: allGrades
+                      .map((level) => Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: AppTheme.primary.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(
+                                  color:
+                                      AppTheme.primary.withValues(alpha: 0.2)),
+                            ),
+                            child: Text(level,
+                                style: const TextStyle(fontSize: 10)),
+                          ))
+                      .toList(),
                 ),
                 const SizedBox(height: 12),
                 SizedBox(

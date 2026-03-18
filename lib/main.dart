@@ -104,6 +104,7 @@ void main() async {
       ],
       child: MaterialApp.router(
         title: 'Nouadhibou High School',
+        debugShowCheckedModeBanner: false,
         theme: AppTheme.light,
         routerConfig: router,
       ),
