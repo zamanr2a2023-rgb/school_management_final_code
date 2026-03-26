@@ -49,7 +49,8 @@ void main() async {
   final AssignmentsRepository assignmentsRepo = AssignmentsRepositoryImpl();
   final StudentsRepository studentsRepo = StudentsRepositoryImpl();
   final TimetableRepository timetableRepo = TimetableRepositoryImpl(prefs);
-  final LiveSessionsRepository liveSessionsRepo = LiveSessionsRepositoryImpl(prefs);
+  final LiveSessionsRepository liveSessionsRepo =
+      LiveSessionsRepositoryImpl(prefs);
   final NotificationsRepository notificationsRepo =
       NotificationsRepositoryImpl();
   final SubscriptionRepository subscriptionRepo =
@@ -98,7 +99,8 @@ void main() async {
         Provider<SubjectsRepository>.value(value: subjectsRepo),
         Provider<StudentDashboardRepository>.value(value: studentDashboardRepo),
         Provider<StudentClassesRepository>.value(value: studentClassesRepo),
-        Provider<StudentAssignmentDetailsRepository>.value(value: studentAssignmentDetailsRepo),
+        Provider<StudentAssignmentDetailsRepository>.value(
+            value: studentAssignmentDetailsRepo),
         Provider<TeacherDashboardRepository>.value(value: teacherDashboardRepo),
         Provider<TeacherClassesRepository>.value(value: teacherClassesRepo),
       ],
