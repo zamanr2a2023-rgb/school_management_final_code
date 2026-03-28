@@ -98,12 +98,28 @@ class LayoutWidget extends StatelessWidget {
                   ),
                   Padding(
                     padding: const EdgeInsets.only(left: 4),
-                    child: CircleAvatar(
-                      radius: 18,
-                      backgroundColor: AppTheme.primary,
-                      child: Text(
-                        _initials(user.name),
-                        style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                    child: Tooltip(
+                      message: lang.t('profile.myProfile'),
+                      child: Material(
+                        color: Colors.transparent,
+                        child: InkWell(
+                          onTap: () => context.go(
+                            isStudent ? '/student/profile' : '/teacher/profile',
+                          ),
+                          customBorder: const CircleBorder(),
+                          child: CircleAvatar(
+                            radius: 18,
+                            backgroundColor: AppTheme.primary,
+                            child: Text(
+                              _initials(user.name),
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ),
                       ),
                     ),
                   ),

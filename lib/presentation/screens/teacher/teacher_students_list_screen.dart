@@ -2,11 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:high_school/core/theme/app_theme.dart';
-import 'package:high_school/domain/entities/class_entity.dart';
-import 'package:high_school/domain/entities/student_entity.dart';
-import 'package:high_school/domain/repositories/students_repository.dart';
-import 'package:high_school/domain/repositories/classes_repository.dart';
-import 'package:high_school/data/datasources/mock_data.dart';
+import 'package:high_school/domain/entities/teacher_roster_student_entity.dart';
+import 'package:high_school/domain/repositories/teacher_students_repository.dart';
 import 'package:high_school/presentation/providers/language_provider.dart';
 
 class TeacherStudentsListScreen extends StatefulWidget {
@@ -22,46 +19,38 @@ class _TeacherStudentsListScreenState extends State<TeacherStudentsListScreen> {
   @override
   Widget build(BuildContext context) {
     final lang = context.watch<LanguageProvider>();
+    final repo = context.read<TeacherStudentsRepository>();
 
-    return FutureBuilder(
-      future: Future.wait([
-        context.read<StudentsRepository>().getStudents(),
-        context.read<ClassesRepository>().getClasses(),
-      ]),
+    return FutureBuilder<TeacherStudentsListResult>(
+      key: ValueKey(_searchQuery),
+      future: repo.listStudents(_searchQuery),
       builder: (context, snapshot) {
         if (!snapshot.hasData) {
           return const Material(color: Colors.transparent, child: Center(child: CircularProgressIndicator()));
         }
-        final allStudents = (snapshot.data![0] as List<StudentEntity>);
-        final allClasses = (snapshot.data![1] as List<ClassEntity>);
-        final filteredStudents = _searchQuery.isEmpty
-            ? allStudents
-            : allStudents.where((s) {
-                final q = _searchQuery.toLowerCase();
-                return s.name.toLowerCase().contains(q) || s.email.toLowerCase().contains(q);
-              }).toList();
+        final result = snapshot.data!;
 
         return Material(
           color: Colors.transparent,
           child: SingleChildScrollView(
             padding: const EdgeInsets.only(bottom: 24),
             child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildHeader(lang),
-              const SizedBox(height: 16),
-              _buildSearch(lang),
-              const SizedBox(height: 16),
-              _buildStats(context, lang, allStudents.length, allClasses.length),
-              const SizedBox(height: 16),
-              _buildStudentsList(context, lang, filteredStudents, allClasses),
-              if (_searchQuery.isNotEmpty) ...[
-                const SizedBox(height: 12),
-                _buildResultsCount(context, lang, filteredStudents.length, allStudents.length),
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildHeader(lang),
+                const SizedBox(height: 16),
+                _buildSearch(lang),
+                const SizedBox(height: 16),
+                _buildStats(context, lang, result),
+                const SizedBox(height: 16),
+                _buildStudentsList(context, lang, result.students),
+                if (_searchQuery.isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  _buildResultsCount(context, lang, result.students.length, result.total),
+                ],
               ],
-            ],
+            ),
           ),
-        ),
         );
       },
     );
@@ -110,17 +99,15 @@ class _TeacherStudentsListScreenState extends State<TeacherStudentsListScreen> {
     );
   }
 
-  Widget _buildStats(BuildContext context, LanguageProvider lang, int totalStudents, int totalClasses) {
-    final avgGrade = totalStudents > 0
-        ? (MockData.students.fold<int>(0, (sum, s) => sum + s.grade) / MockData.students.length).round()
-        : 0;
+  Widget _buildStats(BuildContext context, LanguageProvider lang, TeacherStudentsListResult result) {
+    final avgGrade = result.students.isEmpty ? 0 : result.averageGradePercent.round().clamp(0, 100);
 
     return Row(
       children: [
         Expanded(
           child: _StatCard(
             icon: Icons.people_outline,
-            value: '$totalStudents',
+            value: '${result.total}',
             label: lang.t('students.totalStudents'),
             color: AppTheme.primary,
           ),
@@ -129,7 +116,7 @@ class _TeacherStudentsListScreenState extends State<TeacherStudentsListScreen> {
         Expanded(
           child: _StatCard(
             icon: Icons.menu_book,
-            value: '$totalClasses',
+            value: '${result.distinctClassCount}',
             label: lang.t('students.classes'),
             color: AppTheme.accent,
           ),
@@ -147,25 +134,14 @@ class _TeacherStudentsListScreenState extends State<TeacherStudentsListScreen> {
     );
   }
 
-  List<ClassEntity> _enrolledClassesForStudent(String studentId, List<ClassEntity> allClasses) {
-    final subs = MockData.studentSubscriptions.where((s) => s.studentId == studentId).toList();
-    if (subs.isNotEmpty) {
-      final sub = subs.first;
-      return sub.enrolledClassIds
-          .map((id) {
-            try {
-              return allClasses.firstWhere((c) => c.id == id);
-            } catch (_) {
-              return null;
-            }
-          })
-          .whereType<ClassEntity>()
-          .toList();
+  List<String> _chipLabels(TeacherRosterStudentEntity student) {
+    if (student.classes.isNotEmpty) {
+      return student.classes.map((c) => c.displayLabel).toList();
     }
-    return allClasses.take(3).toList();
+    return student.subjects;
   }
 
-  Widget _buildStudentsList(BuildContext context, LanguageProvider lang, List<StudentEntity> students, List<ClassEntity> allClasses) {
+  Widget _buildStudentsList(BuildContext context, LanguageProvider lang, List<TeacherRosterStudentEntity> students) {
     if (students.isEmpty) {
       return Card(
         elevation: 1,
@@ -192,7 +168,8 @@ class _TeacherStudentsListScreenState extends State<TeacherStudentsListScreen> {
 
     return Column(
       children: students.map((student) {
-        final studentClasses = _enrolledClassesForStudent(student.id, allClasses);
+        final chips = _chipLabels(student);
+        final contact = student.primaryContact;
         return Padding(
           padding: const EdgeInsets.only(bottom: 12),
           child: Card(
@@ -209,8 +186,8 @@ class _TeacherStudentsListScreenState extends State<TeacherStudentsListScreen> {
                   Container(
                     width: 48,
                     height: 48,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFE0E8F7),
+                    decoration: const BoxDecoration(
+                      color: Color(0xFFE0E8F7),
                       shape: BoxShape.circle,
                     ),
                     alignment: Alignment.center,
@@ -238,31 +215,60 @@ class _TeacherStudentsListScreenState extends State<TeacherStudentsListScreen> {
                                 color: const Color(0xFFDFF0D8),
                                 borderRadius: BorderRadius.circular(6),
                               ),
-                              child: Text('${student.grade}%', style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: AppTheme.accent, decoration: TextDecoration.none)),
+                              child: Text(
+                                '${student.avgGradePercent}%',
+                                style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: AppTheme.accent, decoration: TextDecoration.none),
+                              ),
                             ),
                           ],
                         ),
-                        const SizedBox(height: 6),
-                        Row(
-                          children: [
-                            Icon(Icons.email_outlined, size: 14, color: Colors.grey.shade600),
-                            const SizedBox(width: 6),
-                            Expanded(child: Text(student.email, style: TextStyle(fontSize: 12, color: Colors.grey.shade600, decoration: TextDecoration.none), overflow: TextOverflow.ellipsis)),
-                          ],
-                        ),
-                        if (studentClasses.isNotEmpty) ...[
+                        if (contact.isNotEmpty) ...[
+                          const SizedBox(height: 6),
+                          Row(
+                            children: [
+                              Icon(
+                                student.hasEmail ? Icons.email_outlined : Icons.phone_outlined,
+                                size: 14,
+                                color: Colors.grey.shade600,
+                              ),
+                              const SizedBox(width: 6),
+                              Expanded(
+                                child: Text(
+                                  contact,
+                                  style: TextStyle(fontSize: 12, color: Colors.grey.shade600, decoration: TextDecoration.none),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                        if (student.gradeLevel.isNotEmpty) ...[
+                          const SizedBox(height: 4),
+                          Text(
+                            student.gradeLevel,
+                            style: TextStyle(fontSize: 11, color: Colors.grey.shade500, fontWeight: FontWeight.w500),
+                          ),
+                        ],
+                        if (chips.isNotEmpty) ...[
                           const SizedBox(height: 8),
                           Wrap(
                             spacing: 6,
                             runSpacing: 4,
-                            children: studentClasses.map((c) => Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFEFF3F9),
-                                borderRadius: BorderRadius.circular(16),
-                              ),
-                              child: Text(c.name, style: const TextStyle(fontSize: 10, color: Color(0xFF4A5568), decoration: TextDecoration.none)),
-                            )).toList(),
+                            children: chips
+                                .map(
+                                  (label) => Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFEFF3F9),
+                                      borderRadius: BorderRadius.circular(16),
+                                    ),
+                                    child: Text(
+                                      label,
+                                      style: const TextStyle(fontSize: 10, color: Color(0xFF4A5568), decoration: TextDecoration.none),
+                                    ),
+                                  ),
+                                )
+                                .toList(),
                           ),
                         ],
                         const SizedBox(height: 10),
@@ -280,7 +286,14 @@ class _TeacherStudentsListScreenState extends State<TeacherStudentsListScreen> {
                               children: [
                                 const Icon(Icons.trending_up, size: 18),
                                 const SizedBox(width: 8),
-                                Expanded(child: Text(lang.t('students.viewProgressAttendance'), style: const TextStyle(decoration: TextDecoration.none), overflow: TextOverflow.ellipsis, textAlign: TextAlign.center)),
+                                Expanded(
+                                  child: Text(
+                                    lang.t('students.viewProgressAttendance'),
+                                    style: const TextStyle(decoration: TextDecoration.none),
+                                    overflow: TextOverflow.ellipsis,
+                                    textAlign: TextAlign.center,
+                                  ),
+                                ),
                                 const SizedBox(width: 8),
                                 const Icon(Icons.chevron_right, size: 20),
                               ],

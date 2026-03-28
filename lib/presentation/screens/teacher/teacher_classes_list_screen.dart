@@ -67,15 +67,15 @@ class _TeacherClassesListScreenState extends State<TeacherClassesListScreen> {
   Widget _buildHeader(BuildContext context, LanguageProvider lang, int count) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(20, 18, 12, 18),
+      padding: const EdgeInsets.fromLTRB(20, 18, 8, 18),
       decoration: BoxDecoration(
-        color: const Color(0xFF1E3A8A),
+        color: AppTheme.primary,
         borderRadius: BorderRadius.circular(14),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.12),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
           ),
         ],
       ),
@@ -105,11 +105,10 @@ class _TeacherClassesListScreenState extends State<TeacherClassesListScreen> {
                   count == 1
                       ? '1 ${lang.t('classes.assignedToYou')}'
                       : '$count ${lang.t('classes.assignedToYouPlural')}',
-                  style: const TextStyle(
-                    color: Colors.white,
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.92),
                     fontSize: 14,
                     fontWeight: FontWeight.w400,
-                    letterSpacing: 0,
                     height: 1.3,
                     decoration: TextDecoration.none,
                   ),
@@ -121,7 +120,7 @@ class _TeacherClassesListScreenState extends State<TeacherClassesListScreen> {
           ),
           IconButton(
             onPressed: () => setState(() => _showFilters = !_showFilters),
-            icon: const Icon(Icons.filter_list, color: Colors.white, size: 24),
+            icon: const Icon(Icons.tune, color: Colors.white, size: 26),
             style: IconButton.styleFrom(
               foregroundColor: Colors.white,
               backgroundColor: Colors.transparent,
@@ -202,14 +201,14 @@ class _TeacherClassesListScreenState extends State<TeacherClassesListScreen> {
             ? lang.t('classes.showingClass')
             : lang.t('classes.showingClasses').replaceAll('{count}', '$count');
     return Padding(
-      padding: const EdgeInsets.only(left: 4, top: 16),
+      padding: const EdgeInsets.only(left: 2, top: 4),
       child: Text(
         text,
-        style: const TextStyle(
-          fontSize: 14,
-          fontWeight: FontWeight.w400,
+        style: TextStyle(
+          fontSize: 13,
+          fontWeight: FontWeight.w500,
           height: 1.35,
-          color: Color(0xFF6B7280),
+          color: Colors.blueGrey.shade400,
           decoration: TextDecoration.none,
         ),
       ),
@@ -249,9 +248,10 @@ class _TeacherClassesListScreenState extends State<TeacherClassesListScreen> {
     );
   }
 
-  static const Color _cardTitleBlue = Color(0xFF21427D);
-  static const Color _gradePillBg = Color(0xFF2E7D32);
-  static const Color _gradePillText = Colors.white;
+  static const Color _gradePillBg = Color(0xFFE8F5E9);
+  static const Color _gradePillBorder = Color(0xFF81C784);
+  static const Color _gradePillText = Color(0xFF1B5E20);
+  static const Color _cardMetaText = Color(0xFF5C6B8A);
 
   /// Format schedule for display. Converts API raw format e.g. [{day: sat, startMin: 540, endMin: 600}] to "Sat 9:00 AM - 10:00 AM".
   static String _formatSchedule(String? raw) {
@@ -301,107 +301,121 @@ class _TeacherClassesListScreenState extends State<TeacherClassesListScreen> {
 
   Widget _buildClassesList(
       BuildContext context, LanguageProvider lang, List<ClassEntity> classes) {
+    final cardBorder = AppTheme.primary.withValues(alpha: 0.22);
     return Column(
       children: classes
           .map((c) => Padding(
-                padding: const EdgeInsets.only(bottom: 12),
+                padding: const EdgeInsets.only(bottom: 14),
                 child: Material(
                   color: Colors.transparent,
                   child: InkWell(
                     onTap: () => context.go('/teacher/classes/${c.id}'),
-                    borderRadius: BorderRadius.circular(10),
-                    child: Card(
-                      elevation: 2,
-                      shadowColor: Colors.black26,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
+                    borderRadius: BorderRadius.circular(14),
+                    child: Container(
+                      width: double.infinity,
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: cardBorder, width: 1),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.05),
+                            blurRadius: 10,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
                       ),
-                      child: Padding(
-                        padding: const EdgeInsets.all(16),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Expanded(
-                                  child: Text(
-                                    c.subject,
-                                    style: const TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.bold,
-                                      color: _cardTitleBlue,
-                                      decoration: TextDecoration.none,
-                                    ),
-                                  ),
-                                ),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 10,
-                                    vertical: 4,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: _gradePillBg,
-                                    borderRadius: BorderRadius.circular(20),
-                                  ),
-                                  child: Text(
-                                    c.level.endsWith('Grade')
-                                        ? c.level
-                                        : '${c.level} Grade',
-                                    style: const TextStyle(
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w500,
-                                      color: _gradePillText,
-                                      decoration: TextDecoration.none,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 12),
-                            Row(
-                              crossAxisAlignment: CrossAxisAlignment.center,
-                              children: [
-                                Icon(
-                                  Icons.date_range,
-                                  size: 18,
-                                  color: Colors.grey.shade600,
-                                ),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: Text(
-                                    _formatSchedule(c.schedule),
-                                    style: TextStyle(
-                                      fontSize: 14,
-                                      color: Colors.grey.shade600,
-                                      decoration: TextDecoration.none,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 8),
-                            Row(
-                              crossAxisAlignment: CrossAxisAlignment.center,
-                              children: [
-                                Icon(
-                                  Icons.people_outlined,
-                                  size: 18,
-                                  color: Colors.grey.shade600,
-                                ),
-                                const SizedBox(width: 8),
-                                Text(
-                                  '${c.students} ${lang.t('classes.students')}',
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    color: Colors.grey.shade600,
+                      padding: const EdgeInsets.fromLTRB(18, 18, 16, 18),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  c.subject,
+                                  style: const TextStyle(
+                                    fontSize: 17,
+                                    fontWeight: FontWeight.bold,
+                                    color: AppTheme.primary,
+                                    height: 1.2,
                                     decoration: TextDecoration.none,
                                   ),
                                 ),
-                              ],
-                            ),
-                          ],
-                        ),
+                              ),
+                              const SizedBox(width: 10),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                decoration: BoxDecoration(
+                                  color: _gradePillBg,
+                                  borderRadius: BorderRadius.circular(20),
+                                  border: Border.all(color: _gradePillBorder, width: 1),
+                                ),
+                                child: Text(
+                                  c.level.endsWith('Grade') || c.level.endsWith('grade')
+                                      ? c.level
+                                      : '${c.level} Grade',
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    color: _gradePillText,
+                                    decoration: TextDecoration.none,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 14),
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Padding(
+                                padding: const EdgeInsets.only(top: 2),
+                                child: Icon(
+                                  Icons.calendar_today_outlined,
+                                  size: 18,
+                                  color: AppTheme.primary,
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Text(
+                                  _formatSchedule(c.schedule),
+                                  style: const TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w500,
+                                    height: 1.4,
+                                    color: _cardMetaText,
+                                    decoration: TextDecoration.none,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.people_outline,
+                                size: 20,
+                                color: AppTheme.primary,
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Text(
+                                  '${c.students} ${lang.t('classes.studentsEnrolled')}',
+                                  style: const TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w500,
+                                    color: _cardMetaText,
+                                    decoration: TextDecoration.none,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
                       ),
                     ),
                   ),

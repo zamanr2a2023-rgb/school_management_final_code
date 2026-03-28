@@ -1,7 +1,10 @@
 import 'dart:convert';
 import 'package:high_school/core/constants/app_constants.dart';
 import 'package:high_school/core/network/api_response_helper.dart';
+import 'package:high_school/domain/entities/assignment_entity.dart';
 import 'package:high_school/domain/entities/class_entity.dart';
+import 'package:high_school/domain/entities/lesson_entity.dart';
+import 'package:high_school/domain/entities/student_class_detail_result.dart';
 import 'package:high_school/domain/entities/student_class_item.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
@@ -14,13 +17,22 @@ class StudentClassesRemoteDatasource {
   final String _baseUrl;
 
   String get _apiBase =>
-      _baseUrl.endsWith('/') ? '${_baseUrl}api/v1' : '${_baseUrl}/api/v1';
+      _baseUrl.endsWith('/') ? '${_baseUrl}api/v1' : '$_baseUrl/api/v1';
 
   bool get isConfigured => _baseUrl.isNotEmpty;
 
-  /// GET /classes/student/:classId (Student) — returns a single class object.
-  /// Uses auth token. Returns null on error/unauthorized.
+  /// GET /classes/student/:classId (Student) — class, [lessonDetails], [assignmentDetails].
+  Future<StudentClassDetailResult?> getStudentClassDetail(String classId) async {
+    return _fetchStudentClassDetail(classId);
+  }
+
+  /// GET /classes/student/:classId (Student) — class only. Same HTTP as [getStudentClassDetail].
   Future<ClassEntity?> getStudentClassById(String classId) async {
+    final detail = await _fetchStudentClassDetail(classId);
+    return detail?.classEntity;
+  }
+
+  Future<StudentClassDetailResult?> _fetchStudentClassDetail(String classId) async {
     if (!isConfigured || classId.isEmpty) return null;
     final token = _prefs.getString(AppConstants.sessionTokenKey);
     if (token == null || token.isEmpty) return null;
@@ -39,7 +51,15 @@ class StudentClassesRemoteDatasource {
       ensureAuthorized(decoded);
       final data = decoded?['data'];
       if (data is! Map<String, dynamic>) return null;
-      return _mapStudentClassToEntity(data);
+      final cls = _mapStudentClassToEntity(data);
+      if (cls == null) return null;
+      final lessons = _parseLessonDetails(data['lessonDetails'], cls.id);
+      final assignments = _parseAssignmentDetails(data['assignmentDetails'], cls.id);
+      return StudentClassDetailResult(
+        classEntity: cls,
+        lessons: lessons,
+        assignments: assignments,
+      );
     } on UnauthorizedApiException {
       return null;
     } catch (_) {
@@ -127,6 +147,8 @@ class StudentClassesRemoteDatasource {
       room: '',
       level: gradeLevel,
       schoolYear: '',
+      gradeId: m['gradeId']?.toString(),
+      subjectId: m['subjectId']?.toString(),
     );
   }
 
@@ -163,5 +185,117 @@ class StudentClassesRemoteDatasource {
     final hour = h > 12 ? h - 12 : (h == 0 ? 12 : h);
     final ampm = h >= 12 ? 'PM' : 'AM';
     return '$hour:${m.toString().padLeft(2, '0')} $ampm';
+  }
+
+  static List<LessonEntity> _parseLessonDetails(dynamic raw, String fallbackClassId) {
+    if (raw is! List) return [];
+    final out = <LessonEntity>[];
+    for (final e in raw) {
+      final map = e is Map<String, dynamic> ? e : Map<String, dynamic>.from(e as Map);
+      final lesson = _lessonFromJson(map, fallbackClassId);
+      if (lesson != null) out.add(lesson);
+    }
+    return out;
+  }
+
+  static LessonEntity? _lessonFromJson(Map<String, dynamic> m, String fallbackClassId) {
+    final id = m['_id']?.toString() ?? m['id']?.toString();
+    if (id == null || id.isEmpty) return null;
+    final classId = m['classId']?.toString() ?? fallbackClassId;
+    final title = m['title']?.toString() ?? '';
+    final description = m['description']?.toString() ?? '';
+    final ct = (m['contentType'] ?? m['type'])?.toString().toLowerCase() ?? 'text';
+    LessonType type = LessonType.text;
+    if (ct.contains('video')) {
+      type = LessonType.video;
+    } else if (ct.contains('pdf')) {
+      type = LessonType.pdf;
+    }
+    var content = m['content']?.toString() ?? '';
+    if (content.isEmpty) {
+      content = m['videoUrl']?.toString() ?? m['video']?.toString() ?? '';
+    }
+    if (content.isEmpty && m['files'] is List && (m['files'] as List).isNotEmpty) {
+      final f = (m['files'] as List).first;
+      if (f is Map) {
+        content = f['url']?.toString() ?? f['path']?.toString() ?? '';
+      }
+    }
+    var dateStr = m['date']?.toString() ?? '';
+    if (dateStr.isEmpty) {
+      final created = m['createdAt']?.toString();
+      if (created != null && created.length >= 10) dateStr = created.substring(0, 10);
+    }
+    final duration = m['duration']?.toString();
+    final statusStr = (m['status']?.toString() ?? 'published').toLowerCase();
+    final status = statusStr == 'draft' ? LessonStatus.draft : LessonStatus.published;
+    var lastUpdated = m['updatedAt']?.toString() ?? m['lastUpdated']?.toString() ?? m['createdAt']?.toString() ?? '';
+    if (lastUpdated.length >= 10) lastUpdated = lastUpdated.substring(0, 10);
+    if (lastUpdated.isEmpty) lastUpdated = dateStr;
+    final module = m['chapter']?.toString() ?? m['module']?.toString();
+    return LessonEntity(
+      id: id,
+      classId: classId,
+      title: title.isEmpty ? 'Lesson' : title,
+      description: description,
+      type: type,
+      content: content,
+      date: dateStr,
+      duration: duration,
+      status: status,
+      lastUpdated: lastUpdated.isEmpty ? dateStr : lastUpdated,
+      module: module,
+    );
+  }
+
+  static List<AssignmentEntity> _parseAssignmentDetails(dynamic raw, String fallbackClassId) {
+    if (raw is! List) return [];
+    final out = <AssignmentEntity>[];
+    for (final e in raw) {
+      final map = e is Map<String, dynamic> ? e : Map<String, dynamic>.from(e as Map);
+      final a = _assignmentFromJson(map, fallbackClassId);
+      if (a != null) out.add(a);
+    }
+    return out;
+  }
+
+  static AssignmentEntity? _assignmentFromJson(Map<String, dynamic> m, String fallbackClassId) {
+    final id = m['_id']?.toString() ?? m['id']?.toString();
+    if (id == null || id.isEmpty) return null;
+    final classId = m['classId']?.toString() ?? fallbackClassId;
+    final title = m['title']?.toString() ?? '';
+    final description = m['description']?.toString() ?? '';
+    var due = m['dueDate']?.toString() ?? '';
+    if (due.isEmpty) {
+      final dueAt = m['dueAt']?.toString();
+      if (dueAt != null && dueAt.length >= 10) {
+        due = dueAt.substring(0, 10);
+      } else if (dueAt != null) {
+        due = dueAt;
+      }
+    }
+    final p = m['points'];
+    final points = p is int ? p : int.tryParse(p?.toString() ?? '') ?? 0;
+    final statusStr = (m['status']?.toString() ?? 'pending').toLowerCase();
+    AssignmentStatus st = AssignmentStatus.pending;
+    if (statusStr.contains('grad')) {
+      st = AssignmentStatus.graded;
+    } else if (statusStr.contains('submit')) {
+      st = AssignmentStatus.submitted;
+    }
+    final g = m['grade'] ?? m['myGrade'];
+    final grade = g is int ? g : int.tryParse(g?.toString() ?? '');
+    final feedback = m['feedback']?.toString();
+    return AssignmentEntity(
+      id: id,
+      classId: classId,
+      title: title.isEmpty ? 'Assignment' : title,
+      description: description,
+      dueDate: due,
+      points: points,
+      status: st,
+      grade: grade,
+      feedback: feedback,
+    );
   }
 }

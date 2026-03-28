@@ -256,4 +256,60 @@ class AuthRepositoryImpl implements AuthRepository {
     }
     return true;
   }
+
+  @override
+  Future<bool> refreshCurrentUserFromServer() async {
+    final token = _prefs.getString(AppConstants.sessionTokenKey);
+    if (token == null || token.isEmpty) return false;
+    final map = await _remote.getUsersMe(token);
+    if (map == null) return false;
+    final normalized = _normalizeUserMapForSession(map);
+    final user = _userFromMap(normalized);
+    if (user == null) return false;
+    await _saveApiSession(token, normalized);
+    _currentUser = user;
+    return true;
+  }
+
+  static Map<String, dynamic> _normalizeUserMapForSession(Map<String, dynamic> m) {
+    final out = Map<String, dynamic>.from(m);
+    final id = out['id'] ?? out['_id'];
+    if (id != null) out['id'] = id.toString();
+    return out;
+  }
+
+  @override
+  Future<void> applyProfileUpdate({
+    required String name,
+    required String phone,
+  }) async {
+    if (_currentUser == null) return;
+    final token = _prefs.getString(AppConstants.sessionTokenKey);
+    final userJson = _prefs.getString(AppConstants.sessionUserJsonKey);
+    if (token != null &&
+        token.isNotEmpty &&
+        userJson != null &&
+        userJson.isNotEmpty) {
+      try {
+        final map = Map<String, dynamic>.from(
+          jsonDecode(userJson) as Map<String, dynamic>,
+        );
+        map['name'] = name;
+        map['phone'] = phone;
+        await _saveApiSession(token, map);
+        _currentUser = _userFromMap(map);
+      } catch (_) {}
+      return;
+    }
+    _currentUser = UserEntity(
+      id: _currentUser!.id,
+      name: name,
+      email: _currentUser!.email,
+      role: _currentUser!.role,
+      avatar: _currentUser!.avatar,
+      grade: _currentUser!.grade,
+      subject: _currentUser!.subject,
+      enrolledClassIds: _currentUser!.enrolledClassIds,
+    );
+  }
 }

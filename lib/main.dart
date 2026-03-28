@@ -16,9 +16,12 @@ import 'package:high_school/domain/repositories/subscription_repository.dart';
 import 'package:high_school/domain/repositories/subjects_repository.dart';
 import 'package:high_school/domain/repositories/student_dashboard_repository.dart';
 import 'package:high_school/domain/repositories/student_classes_repository.dart';
+import 'package:high_school/domain/repositories/student_profile_repository.dart';
 import 'package:high_school/domain/repositories/student_assignment_details_repository.dart';
 import 'package:high_school/domain/repositories/teacher_dashboard_repository.dart';
 import 'package:high_school/domain/repositories/teacher_classes_repository.dart';
+import 'package:high_school/domain/repositories/teacher_profile_repository.dart';
+import 'package:high_school/domain/repositories/teacher_students_repository.dart';
 import 'package:high_school/data/repositories/auth_repository_impl.dart';
 import 'package:high_school/data/repositories/classes_repository_impl.dart';
 import 'package:high_school/data/repositories/lessons_repository_impl.dart';
@@ -31,9 +34,15 @@ import 'package:high_school/data/repositories/subscription_repository_impl.dart'
 import 'package:high_school/data/repositories/subjects_repository_impl.dart';
 import 'package:high_school/data/repositories/student_dashboard_repository_impl.dart';
 import 'package:high_school/data/repositories/student_classes_repository_impl.dart';
+import 'package:high_school/data/repositories/student_profile_repository_impl.dart';
 import 'package:high_school/data/repositories/student_assignment_details_repository_impl.dart';
 import 'package:high_school/data/repositories/teacher_dashboard_repository_impl.dart';
 import 'package:high_school/data/repositories/teacher_classes_repository_impl.dart';
+import 'package:high_school/data/repositories/teacher_profile_repository_impl.dart';
+import 'package:high_school/data/repositories/teacher_students_repository_impl.dart';
+import 'package:high_school/data/datasources/assignments_remote_datasource.dart';
+import 'package:high_school/data/datasources/lessons_remote_datasource.dart';
+import 'package:high_school/data/datasources/student_lesson_remote_datasource.dart';
 import 'package:high_school/presentation/providers/auth_provider.dart';
 import 'package:high_school/presentation/providers/language_provider.dart';
 import 'package:high_school/presentation/providers/subscription_provider.dart';
@@ -60,12 +69,24 @@ void main() async {
       StudentDashboardRepositoryImpl(prefs);
   final StudentClassesRepository studentClassesRepo =
       StudentClassesRepositoryImpl(prefs);
+  final StudentProfileRepository studentProfileRepo =
+      StudentProfileRepositoryImpl(prefs);
   final StudentAssignmentDetailsRepository studentAssignmentDetailsRepo =
       StudentAssignmentDetailsRepositoryImpl(prefs);
   final TeacherDashboardRepository teacherDashboardRepo =
       TeacherDashboardRepositoryImpl(prefs);
   final TeacherClassesRepository teacherClassesRepo =
       TeacherClassesRepositoryImpl(prefs, classesRepo);
+  final TeacherProfileRepository teacherProfileRepo =
+      TeacherProfileRepositoryImpl(prefs);
+  final TeacherStudentsRepository teacherStudentsRepo =
+      TeacherStudentsRepositoryImpl(prefs, studentsRepo, classesRepo);
+  final LessonsRemoteDatasource lessonsRemoteDatasource =
+      LessonsRemoteDatasource(prefs);
+  final AssignmentsRemoteDatasource assignmentsRemoteDatasource =
+      AssignmentsRemoteDatasource(prefs);
+  final StudentLessonRemoteDatasource studentLessonRemoteDatasource =
+      StudentLessonRemoteDatasource(prefs);
 
   // Providers
   final authProvider = AuthProvider(authRepo);
@@ -99,10 +120,18 @@ void main() async {
         Provider<SubjectsRepository>.value(value: subjectsRepo),
         Provider<StudentDashboardRepository>.value(value: studentDashboardRepo),
         Provider<StudentClassesRepository>.value(value: studentClassesRepo),
+        Provider<StudentProfileRepository>.value(value: studentProfileRepo),
         Provider<StudentAssignmentDetailsRepository>.value(
             value: studentAssignmentDetailsRepo),
         Provider<TeacherDashboardRepository>.value(value: teacherDashboardRepo),
         Provider<TeacherClassesRepository>.value(value: teacherClassesRepo),
+        Provider<TeacherProfileRepository>.value(value: teacherProfileRepo),
+        Provider<TeacherStudentsRepository>.value(value: teacherStudentsRepo),
+        Provider<LessonsRemoteDatasource>.value(value: lessonsRemoteDatasource),
+        Provider<AssignmentsRemoteDatasource>.value(
+            value: assignmentsRemoteDatasource),
+        Provider<StudentLessonRemoteDatasource>.value(
+            value: studentLessonRemoteDatasource),
       ],
       child: MaterialApp.router(
         title: 'Nouadhibou High School',

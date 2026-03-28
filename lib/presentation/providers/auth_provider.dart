@@ -65,6 +65,21 @@ class AuthProvider with ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> syncUserFromProfile({
+    required String name,
+    required String phone,
+  }) async {
+    await _authRepository.applyProfileUpdate(name: name, phone: phone);
+    notifyListeners();
+  }
+
+  /// Prefer after profile save: loads latest name/phone from GET /users/me.
+  Future<bool> refreshUserFromServer() async {
+    final ok = await _authRepository.refreshCurrentUserFromServer();
+    notifyListeners();
+    return ok;
+  }
+
   Future<bool> register({
     required String name,
     required String phone,

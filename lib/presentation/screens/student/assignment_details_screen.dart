@@ -1,5 +1,5 @@
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import 'package:high_school/core/theme/app_theme.dart';
 import 'package:high_school/domain/entities/assignment_detail_result.dart';
@@ -54,7 +54,40 @@ class _AssignmentDetailsScreenState extends State<AssignmentDetailsScreen> {
   String? _selectedFileName;
   String? _selectedFilePath;
   bool _submitted = false;
-  final ImagePicker _picker = ImagePicker();
+
+  static bool _isPdfFileName(String name) {
+    return name.toLowerCase().trim().endsWith('.pdf');
+  }
+
+  Future<void> _pickPdf(BuildContext pickerContext, LanguageProvider lang) async {
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: const ['pdf'],
+      allowMultiple: false,
+    );
+    if (!pickerContext.mounted) return;
+    if (result == null || result.files.isEmpty) return;
+    final f = result.files.single;
+    final name = f.name;
+    if (!_isPdfFileName(name)) {
+      ScaffoldMessenger.of(pickerContext).showSnackBar(
+        SnackBar(content: Text(lang.t('assignments.pdfOnlyError'))),
+      );
+      return;
+    }
+    final path = f.path;
+    if (path == null || path.isEmpty) {
+      ScaffoldMessenger.of(pickerContext).showSnackBar(
+        SnackBar(content: Text(lang.t('assignments.pdfOnlyError'))),
+      );
+      return;
+    }
+    if (!mounted) return;
+    setState(() {
+      _selectedFileName = name;
+      _selectedFilePath = path;
+    });
+  }
 
   int _daysUntilDue(String dueDateStr) {
     try {
@@ -80,26 +113,6 @@ class _AssignmentDetailsScreenState extends State<AssignmentDetailsScreen> {
       }
     } catch (_) {}
     return dateStr;
-  }
-
-  Future<void> _pickFileFromGallery() async {
-    final XFile? picked = await _picker.pickImage(source: ImageSource.gallery);
-    if (picked != null) {
-      setState(() {
-        _selectedFileName = picked.name;
-        _selectedFilePath = picked.path;
-      });
-    }
-  }
-
-  Future<void> _pickFileFromCamera() async {
-    final XFile? picked = await _picker.pickImage(source: ImageSource.camera);
-    if (picked != null) {
-      setState(() {
-        _selectedFileName = picked.name;
-        _selectedFilePath = picked.path;
-      });
-    }
   }
 
   @override
@@ -525,7 +538,7 @@ class _AssignmentDetailsScreenState extends State<AssignmentDetailsScreen> {
                   ],
                 ),
                 const SizedBox(height: 4),
-                Text('Upload your work or write your response below', style: TextStyle(fontSize: 12, color: Colors.white.withValues(alpha: 0.9))),
+                Text(lang.t('assignments.uploadPdfHint'), style: TextStyle(fontSize: 12, color: Colors.white.withValues(alpha: 0.9))),
               ],
             ),
           ),
@@ -534,7 +547,7 @@ class _AssignmentDetailsScreenState extends State<AssignmentDetailsScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Text(lang.t('assignments.uploadFile'), style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.grey.shade700)),
+                Text('${lang.t('assignments.uploadFile')} (PDF)', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.grey.shade700)),
                 const SizedBox(height: 8),
                 InkWell(
                   onTap: () async {
@@ -549,32 +562,25 @@ class _AssignmentDetailsScreenState extends State<AssignmentDetailsScreen> {
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               ListTile(
-                                leading: const Icon(Icons.photo_library),
-                                title: const Text('Choose from gallery'),
+                                leading: Icon(Icons.picture_as_pdf, color: Colors.red.shade700),
+                                title: Text(lang.t('assignments.choosePdf')),
                                 onTap: () async {
                                   Navigator.of(ctx).pop();
-                                  await _pickFileFromGallery();
+                                  await _pickPdf(context, lang);
                                 },
                               ),
-                              ListTile(
-                                leading: const Icon(Icons.photo_camera),
-                                title: const Text('Take a photo'),
-                                onTap: () async {
-                                  Navigator.of(ctx).pop();
-                                  await _pickFileFromCamera();
-                                },
-                              ),
-                              if (_selectedFileName != null) ListTile(
-                                leading: const Icon(Icons.delete_outline),
-                                title: const Text('Remove file'),
-                                onTap: () {
-                                  Navigator.of(ctx).pop();
-                                  setState(() {
-                                    _selectedFileName = null;
-                                    _selectedFilePath = null;
-                                  });
-                                },
-                              ),
+                              if (_selectedFileName != null)
+                                ListTile(
+                                  leading: const Icon(Icons.delete_outline),
+                                  title: Text(lang.t('assignments.removeFile')),
+                                  onTap: () {
+                                    Navigator.of(ctx).pop();
+                                    setState(() {
+                                      _selectedFileName = null;
+                                      _selectedFilePath = null;
+                                    });
+                                  },
+                                ),
                             ],
                           ),
                         );
@@ -606,7 +612,7 @@ class _AssignmentDetailsScreenState extends State<AssignmentDetailsScreen> {
                     decoration: BoxDecoration(color: Colors.blue.shade50, borderRadius: BorderRadius.circular(8), border: Border.all(color: Colors.blue.shade200)),
                     child: Row(
                       children: [
-                        Icon(Icons.insert_drive_file, size: 20, color: Colors.blue.shade700),
+                        Icon(Icons.picture_as_pdf, size: 20, color: Colors.blue.shade700),
                         const SizedBox(width: 8),
                         Expanded(child: Text(_selectedFileName!, style: TextStyle(fontSize: 12, color: Colors.blue.shade900), maxLines: 1, overflow: TextOverflow.ellipsis)),
                         IconButton(
@@ -655,7 +661,7 @@ class _AssignmentDetailsScreenState extends State<AssignmentDetailsScreen> {
                               textAnswer: _submissionText.trim().isEmpty ? null : _submissionText.trim(),
                               filePath: _selectedFilePath,
                             );
-                            if (!mounted) return;
+                            if (!context.mounted) return;
                             if (ok) {
                               setState(() => _submitted = true);
                               ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(lang.t('assignments.submitted'))));

@@ -8,7 +8,41 @@ import 'package:high_school/domain/entities/lesson_entity.dart';
 import 'package:high_school/domain/repositories/assignments_repository.dart';
 import 'package:high_school/domain/repositories/classes_repository.dart';
 import 'package:high_school/domain/repositories/lessons_repository.dart';
+import 'package:high_school/domain/repositories/student_classes_repository.dart';
 import 'package:high_school/presentation/providers/language_provider.dart';
+
+class _ClassDetailsLoaded {
+  const _ClassDetailsLoaded({
+    required this.cls,
+    required this.lessons,
+    required this.assignments,
+  });
+  final ClassEntity? cls;
+  final List<LessonEntity> lessons;
+  final List<AssignmentEntity> assignments;
+}
+
+Future<_ClassDetailsLoaded> _loadStudentClassDetails({
+  required String classId,
+  required ClassEntity? passedClass,
+  required StudentClassesRepository studentClassesRepo,
+  required ClassesRepository classesRepo,
+  required LessonsRepository lessonsRepo,
+  required AssignmentsRepository assignmentsRepo,
+}) async {
+  final detail = await studentClassesRepo.getStudentClassDetail(classId);
+  if (detail != null) {
+    return _ClassDetailsLoaded(
+      cls: detail.classEntity,
+      lessons: detail.lessons,
+      assignments: detail.assignments,
+    );
+  }
+  final cls = passedClass ?? await classesRepo.getClassById(classId);
+  final lessons = await lessonsRepo.getLessons(classId: classId);
+  final assignments = await assignmentsRepo.getAssignments(classId: classId);
+  return _ClassDetailsLoaded(cls: cls, lessons: lessons, assignments: assignments);
+}
 
 class ClassDetailsScreen extends StatelessWidget {
   const ClassDetailsScreen({
@@ -31,23 +65,26 @@ class ClassDetailsScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final lang = context.watch<LanguageProvider>();
 
-    return FutureBuilder(
-      future: Future.wait([
-        passedClass != null
-            ? Future<ClassEntity?>.value(passedClass)
-            : context.read<ClassesRepository>().getClassById(classId),
-        context.read<LessonsRepository>().getLessons(classId: classId),
-        context.read<AssignmentsRepository>().getAssignments(classId: classId),
-      ]),
+    return FutureBuilder<_ClassDetailsLoaded>(
+      future: _loadStudentClassDetails(
+        classId: classId,
+        passedClass: passedClass,
+        studentClassesRepo: context.read<StudentClassesRepository>(),
+        classesRepo: context.read<ClassesRepository>(),
+        lessonsRepo: context.read<LessonsRepository>(),
+        assignmentsRepo: context.read<AssignmentsRepository>(),
+      ),
       builder: (context, snapshot) {
-        if (!snapshot.hasData)
+        if (!snapshot.hasData) {
           return const Center(child: CircularProgressIndicator());
-        final cls = snapshot.data![0] as ClassEntity?;
-        final lessons = (snapshot.data![1] as List).cast<LessonEntity>();
-        final assignments =
-            (snapshot.data![2] as List).cast<AssignmentEntity>();
-        if (cls == null)
+        }
+        final loaded = snapshot.data!;
+        final cls = loaded.cls;
+        final lessons = loaded.lessons;
+        final assignments = loaded.assignments;
+        if (cls == null) {
           return Center(child: Text(lang.t('classes.classNotFound')));
+        }
 
         final primaryColor = _colorFromHex(cls.color);
         final primaryColorDark = primaryColor.withValues(alpha: 0.85);
@@ -83,42 +120,73 @@ class ClassDetailsScreen extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Text(cls.name,
-                          style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold)),
+                      Text(
+                        cls.name,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
                       const SizedBox(height: 2),
-                      Text(cls.teacher,
-                          style: TextStyle(
-                              color: Colors.white.withValues(alpha: 0.9),
-                              fontSize: 13)),
+                      Text(
+                        cls.teacher,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.9),
+                          fontSize: 13,
+                        ),
+                      ),
                       const SizedBox(height: 6),
-                      Wrap(
-                        spacing: 10,
-                        runSpacing: 2,
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Row(mainAxisSize: MainAxisSize.min, children: [
-                            Icon(Icons.calendar_today,
-                                size: 12,
-                                color: Colors.white.withValues(alpha: 0.9)),
-                            const SizedBox(width: 4),
-                            Text(cls.schedule,
-                                style: TextStyle(
-                                    color: Colors.white.withValues(alpha: 0.95),
-                                    fontSize: 11)),
-                          ]),
-                          Row(mainAxisSize: MainAxisSize.min, children: [
-                            Icon(Icons.people,
-                                size: 12,
-                                color: Colors.white.withValues(alpha: 0.9)),
-                            const SizedBox(width: 4),
-                            Text(
-                                '${cls.students} ${lang.t('classes.students')}',
-                                style: TextStyle(
-                                    color: Colors.white.withValues(alpha: 0.95),
-                                    fontSize: 11)),
-                          ]),
+                          Padding(
+                            padding: const EdgeInsets.only(top: 1),
+                            child: Icon(
+                              Icons.calendar_today,
+                              size: 12,
+                              color: Colors.white.withValues(alpha: 0.9),
+                            ),
+                          ),
+                          const SizedBox(width: 4),
+                          Expanded(
+                            child: Text(
+                              cls.schedule,
+                              maxLines: 3,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: Colors.white.withValues(alpha: 0.95),
+                                fontSize: 11,
+                                height: 1.25,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.people,
+                            size: 12,
+                            color: Colors.white.withValues(alpha: 0.9),
+                          ),
+                          const SizedBox(width: 4),
+                          Flexible(
+                            child: Text(
+                              '${cls.students} ${lang.t('classes.students')}',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: Colors.white.withValues(alpha: 0.95),
+                                fontSize: 11,
+                              ),
+                            ),
+                          ),
                         ],
                       ),
                     ],
@@ -232,7 +300,7 @@ class _LessonsTab extends StatelessWidget {
             color: Colors.white,
             borderRadius: BorderRadius.circular(12),
             child: InkWell(
-              onTap: () => context.go('/student/lessons/${l.id}'),
+              onTap: () => context.push('/student/lessons/${l.id}'),
               borderRadius: BorderRadius.circular(12),
               child: Container(
                 padding: const EdgeInsets.all(12),

@@ -21,4 +21,10 @@ abstract class AuthRepository {
     List<String>? assignedGradeIds,
     List<String>? assignedGrades,
   });
+
+  /// After PATCH /profiles/me, refresh cached session user (`name`, `phone`) when using API login.
+  Future<void> applyProfileUpdate({required String name, required String phone});
+
+  /// GET /users/me when using API session. Returns true if local session user was updated.
+  Future<bool> refreshCurrentUserFromServer();
 }
