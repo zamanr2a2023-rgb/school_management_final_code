@@ -27,7 +27,7 @@ class LanguageSelectorWidget extends StatelessWidget {
             border: Border.all(color: lightBlueBorder, width: 1.2),
             boxShadow: [
               BoxShadow(
-                color: lightBlueBorder.withOpacity(0.25),
+                color: lightBlueBorder.withValues(alpha: 0.25),
                 blurRadius: 8,
                 offset: const Offset(0, 2),
               ),
@@ -83,18 +83,21 @@ class _LanguageMenu extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SafeArea(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: AppLanguage.values
-            .map((l) => ListTile(
-                  title: Text(l.displayName),
-                  onTap: () {
-                    lang.setLanguage(l);
-                    Navigator.of(context).pop();
-                  },
-                ))
-            .toList(),
+    return Material(
+      color: Theme.of(context).colorScheme.surface,
+      child: SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: AppLanguage.values
+              .map((l) => ListTile(
+                    title: Text(l.displayName),
+                    onTap: () {
+                      lang.setLanguage(l);
+                      Navigator.of(context).pop();
+                    },
+                  ))
+              .toList(),
+        ),
       ),
     );
   }

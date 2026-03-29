@@ -1,11 +1,13 @@
 import 'dart:convert';
 import 'dart:io';
+
 import 'package:high_school/core/constants/app_constants.dart';
 import 'package:high_school/core/network/api_response_helper.dart';
 import 'package:high_school/domain/entities/assignment_detail_result.dart';
 import 'package:high_school/domain/entities/assignment_entity.dart';
 import 'package:high_school/domain/entities/class_entity.dart';
 import 'package:http/http.dart' as http;
+import 'package:http_parser/http_parser.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class StudentAssignmentDetailsRemoteDatasource {
@@ -40,8 +42,15 @@ class StudentAssignmentDetailsRemoteDatasource {
     if (filePath != null && filePath.isNotEmpty) {
       final file = File(filePath);
       if (await file.exists()) {
+        final filename = _basename(file.path);
+        final contentType = _mediaTypeForFilename(filename);
         request.files.add(
-          await http.MultipartFile.fromPath('file', file.path),
+          await http.MultipartFile.fromPath(
+            'file',
+            file.path,
+            filename: filename,
+            contentType: contentType,
+          ),
         );
       }
     }
@@ -205,6 +214,8 @@ class StudentAssignmentDetailsRemoteDatasource {
       room: '',
       level: gradeLevel,
       schoolYear: '',
+      gradeId: classInfoJson['gradeId']?.toString(),
+      subjectId: classInfoJson['subjectId']?.toString(),
     );
   }
 
@@ -213,5 +224,33 @@ class StudentAssignmentDetailsRemoteDatasource {
     if (v is int) return v;
     if (v is num) return v.toInt();
     return int.tryParse(v.toString()) ?? 0;
+  }
+
+  static String _basename(String path) {
+    final i = path.replaceAll('\\', '/').lastIndexOf('/');
+    return i >= 0 ? path.substring(i + 1) : path;
+  }
+
+  /// Backend validates allowed types from the part Content-Type (not only extension).
+  static MediaType _mediaTypeForFilename(String filename) {
+    final lower = filename.toLowerCase();
+    if (lower.endsWith('.pdf')) return MediaType('application', 'pdf');
+    if (lower.endsWith('.doc')) return MediaType('application', 'msword');
+    if (lower.endsWith('.docx')) {
+      return MediaType(
+        'application',
+        'vnd.openxmlformats-officedocument.wordprocessingml.document',
+      );
+    }
+    if (lower.endsWith('.txt')) return MediaType('text', 'plain');
+    if (lower.endsWith('.png')) return MediaType('image', 'png');
+    if (lower.endsWith('.jpg') || lower.endsWith('.jpeg')) {
+      return MediaType('image', 'jpeg');
+    }
+    if (lower.endsWith('.webp')) return MediaType('image', 'webp');
+    if (lower.endsWith('.gif')) return MediaType('image', 'gif');
+    if (lower.endsWith('.mp4')) return MediaType('video', 'mp4');
+    if (lower.endsWith('.webm')) return MediaType('video', 'webm');
+    return MediaType('application', 'octet-stream');
   }
 }

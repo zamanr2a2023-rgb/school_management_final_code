@@ -11,6 +11,9 @@ class ClassEntity {
   final String room;
   final String level;
   final String schoolYear;
+  /// From API (e.g. GET /classes/:id). Required for teacher POST /lesson.
+  final String? gradeId;
+  final String? subjectId;
 
   const ClassEntity({
     required this.id,
@@ -25,5 +28,7 @@ class ClassEntity {
     required this.room,
     required this.level,
     required this.schoolYear,
+    this.gradeId,
+    this.subjectId,
   });
 }

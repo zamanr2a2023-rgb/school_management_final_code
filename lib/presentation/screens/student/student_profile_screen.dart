@@ -1,14 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:high_school/core/theme/app_theme.dart';
-import 'package:high_school/domain/entities/class_entity.dart';
+import 'package:high_school/domain/entities/student_profile_me_entity.dart';
 import 'package:high_school/domain/entities/user_entity.dart';
-import 'package:high_school/domain/repositories/assignments_repository.dart';
-import 'package:high_school/domain/repositories/classes_repository.dart';
-import 'package:high_school/domain/entities/assignment_entity.dart';
+import 'package:high_school/domain/repositories/student_profile_repository.dart';
 import 'package:high_school/presentation/providers/auth_provider.dart';
 import 'package:high_school/presentation/providers/language_provider.dart';
-import 'package:high_school/presentation/providers/subscription_provider.dart';
 import 'package:high_school/presentation/widgets/language_selector_widget.dart';
 
 class StudentProfileScreen extends StatefulWidget {
@@ -19,23 +16,50 @@ class StudentProfileScreen extends StatefulWidget {
 }
 
 class _StudentProfileScreenState extends State<StudentProfileScreen> {
-  String? _displayName;
-  String? _displayEmail;
-  String _phone = '+222 45 67 89 01';
-  String _address = 'Nouadhibou, Mauritania';
-  String _parentName = 'Ahmed Hassan';
-  String _parentPhone = '+222 45 67 89 02';
-  String _parentEmail = 'ahmed.hassan@email.mr';
+  /// Local overrides after Edit Profile (until next fetch). Null = use API value.
+  String? _overrideName;
+  String? _overridePhone;
+  String? _overrideAddress;
+
+  Future<StudentProfileMe?>? _profileFuture;
 
   static String _initials(String name) {
-    return name.trim().split(RegExp(r'\s+')).map((s) => s.isNotEmpty ? s[0] : '').take(2).join().toUpperCase();
+    return name
+        .trim()
+        .split(RegExp(r'\s+'))
+        .map((s) => s.isNotEmpty ? s[0] : '')
+        .take(2)
+        .join()
+        .toUpperCase();
   }
 
-  /// Use translation; if the key is returned unchanged (missing translation), use fallback.
   static String _t(LanguageProvider lang, String key, String fallback) {
     final s = lang.t(key);
     return (s == key || s.isEmpty) ? fallback : s;
   }
+
+  static String _formatPercentStat(num value) {
+    if (value == value.roundToDouble()) {
+      return '${value.toInt()}%';
+    }
+    return '${value.toStringAsFixed(1)}%';
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _profileFuture ??=
+        context.read<StudentProfileRepository>().getMyProfile();
+  }
+
+  String _name(UserEntity user, StudentProfileMe? profile) =>
+      _overrideName ?? profile?.name ?? user.name;
+
+  String _phone(StudentProfileMe? profile) =>
+      _overridePhone ?? profile?.phone ?? '';
+
+  String _address(StudentProfileMe? profile) =>
+      _overrideAddress ?? profile?.address ?? '';
 
   @override
   Widget build(BuildContext context) {
@@ -44,43 +68,55 @@ class _StudentProfileScreenState extends State<StudentProfileScreen> {
     final user = auth.user;
     if (user == null) return const SizedBox();
 
-    return FutureBuilder(
-      future: Future.wait([
-        context.read<SubscriptionProvider>().load(user.id),
-        context.read<ClassesRepository>().getClasses(),
-        context.read<AssignmentsRepository>().getAssignments(),
-      ]),
+    return FutureBuilder<StudentProfileMe?>(
+      future: _profileFuture,
       builder: (context, snapshot) {
-        if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
-        final subscription = context.read<SubscriptionProvider>().subscription;
-        final enrolledIds = subscription?.enrolledClassIds ?? [];
-        final classes = (snapshot.data![1] as List).cast<ClassEntity>();
-        final assignments = (snapshot.data![2] as List).cast<AssignmentEntity>();
-        final enrolledClasses = classes.where((c) => enrolledIds.contains(c.id)).toList();
-        final completedCount = assignments.where((a) => a.status == AssignmentStatus.graded || a.status == AssignmentStatus.submitted).length;
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        final profile = snapshot.data;
 
-    return SingleChildScrollView(
-      padding: const EdgeInsets.only(bottom: 24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _buildHeader(lang),
-          const SizedBox(height: 16),
-          _buildProfileCard(context, user, lang),
-          const SizedBox(height: 16),
-          _buildAcademicCard(context, lang, enrolledClasses.length, completedCount, assignments.length),
-          const SizedBox(height: 16),
-          _buildParentCard(context, lang),
-          const SizedBox(height: 16),
-          _buildCurrentClassesCard(context, lang, enrolledClasses),
-          const SizedBox(height: 16),
-          _buildLanguageCard(context, lang),
-          const SizedBox(height: 16),
-          _buildAchievementsCard(context, lang),
-          const SizedBox(height: 24),
-        ],
-      ),
-    );
+        return RefreshIndicator(
+          onRefresh: () async {
+            final future =
+                context.read<StudentProfileRepository>().getMyProfile();
+            setState(() => _profileFuture = future);
+            await future;
+          },
+          child: SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.only(bottom: 24),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildHeader(lang),
+                if (profile == null) ...[
+                  const SizedBox(height: 8),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                    child: Text(
+                      _t(
+                        lang,
+                        'profile.loadError',
+                        'Could not load profile. Pull to refresh.',
+                      ),
+                      style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 16),
+                _buildProfileCard(context, user, profile, lang),
+                const SizedBox(height: 16),
+                _buildAcademicCard(context, lang, profile),
+                const SizedBox(height: 16),
+                _buildCurrentClassesCard(context, lang, profile),
+                const SizedBox(height: 16),
+                _buildLanguageCard(context, lang),
+                const SizedBox(height: 24),
+              ],
+            ),
+          ),
+        );
       },
     );
   }
@@ -92,106 +128,298 @@ class _StudentProfileScreenState extends State<StudentProfileScreen> {
       decoration: BoxDecoration(
         color: AppTheme.primary,
         borderRadius: BorderRadius.circular(16),
-        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.12), blurRadius: 8, offset: const Offset(0, 3))],
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.12),
+            blurRadius: 8,
+            offset: const Offset(0, 3),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(lang.t('profile.myProfile'), style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold, decoration: TextDecoration.none)),
+          Text(
+            lang.t('profile.myProfile'),
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
+              decoration: TextDecoration.none,
+            ),
+          ),
           const SizedBox(height: 6),
-          Text(_t(lang, 'profile.managePersonalInfo', 'Manage your personal information'), style: TextStyle(color: Colors.white.withValues(alpha: 0.88), fontSize: 15, decoration: TextDecoration.none)),
+          Text(
+            _t(lang, 'profile.managePersonalInfo',
+                'Manage your personal information'),
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 16,
+              fontWeight: FontWeight.normal,
+              decoration: TextDecoration.none,
+            ),
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildProfileCard(BuildContext context, UserEntity user, LanguageProvider lang) {
+  Widget _buildProfileCard(
+    BuildContext context,
+    UserEntity user,
+    StudentProfileMe? profile,
+    LanguageProvider lang,
+  ) {
+    final displayName = _name(user, profile);
+    final phone = _phone(profile);
+    final address = _address(profile);
+    final imageUrl = profile?.profileImageUrl;
+
     return Card(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: BorderSide(color: AppTheme.primary.withValues(alpha: 0.2), width: 2)),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: AppTheme.primary.withValues(alpha: 0.2), width: 2),
+      ),
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
           children: [
-            CircleAvatar(radius: 40, backgroundColor: AppTheme.primary.withValues(alpha: 0.2), child: Text(_initials(_displayName ?? user.name), style: const TextStyle(color: AppTheme.primary, fontSize: 28, fontWeight: FontWeight.bold))),
+            CircleAvatar(
+              radius: 40,
+              backgroundColor: AppTheme.primary.withValues(alpha: 0.2),
+              child: imageUrl != null && imageUrl.isNotEmpty
+                  ? ClipOval(
+                      child: Image.network(
+                        imageUrl,
+                        width: 80,
+                        height: 80,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => Text(
+                          _initials(displayName),
+                          style: const TextStyle(
+                            color: AppTheme.primary,
+                            fontSize: 28,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    )
+                  : Text(
+                      _initials(displayName),
+                      style: const TextStyle(
+                        color: AppTheme.primary,
+                        fontSize: 28,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+            ),
             const SizedBox(height: 12),
-            Text(_displayName ?? user.name, style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
+            Text(
+              displayName,
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+              textAlign: TextAlign.center,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+            if (profile != null && profile.role.isNotEmpty) ...[
+              const SizedBox(height: 6),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: AppTheme.primary.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: AppTheme.primary.withValues(alpha: 0.2),
+                  ),
+                ),
+                child: Text(
+                  profile.role,
+                  style: const TextStyle(color: AppTheme.primary, fontSize: 12),
+                ),
+              ),
+            ],
             if (user.grade != null && user.grade!.isNotEmpty) ...[
               const SizedBox(height: 6),
-              Container(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4), decoration: BoxDecoration(color: AppTheme.primary.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(8), border: Border.all(color: AppTheme.primary.withValues(alpha: 0.2))), child: Text(user.grade!, style: const TextStyle(color: AppTheme.primary, fontSize: 12))),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: AppTheme.primary.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: AppTheme.primary.withValues(alpha: 0.2),
+                  ),
+                ),
+                child: Text(
+                  user.grade!,
+                  style: const TextStyle(color: AppTheme.primary, fontSize: 12),
+                ),
+              ),
             ],
             const SizedBox(height: 16),
             OutlinedButton.icon(
-              onPressed: () => _showEditDialog(context, user, lang),
+              onPressed: () => _showEditDialog(context, user, profile, lang),
               icon: const Icon(Icons.edit, size: 18),
               label: Text(_t(lang, 'profile.editProfile', 'Edit Profile')),
               style: OutlinedButton.styleFrom(foregroundColor: AppTheme.primary),
             ),
             const Divider(height: 24),
-            Row(children: [Icon(Icons.email, size: 18, color: AppTheme.primary), const SizedBox(width: 12), Expanded(child: Text(_displayEmail ?? user.email, style: TextStyle(fontSize: 14, color: Colors.grey.shade600)))]),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(Icons.phone, size: 18, color: AppTheme.primary),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    phone.isEmpty ? '—' : phone,
+                    style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
+                  ),
+                ),
+              ],
+            ),
             const SizedBox(height: 8),
-            Row(children: [Icon(Icons.phone, size: 18, color: AppTheme.primary), const SizedBox(width: 12), Text(_phone, style: TextStyle(fontSize: 14, color: Colors.grey.shade600))]),
-            const SizedBox(height: 8),
-            Row(children: [Icon(Icons.location_on, size: 18, color: AppTheme.primary), const SizedBox(width: 12), Expanded(child: Text(_address, style: TextStyle(fontSize: 14, color: Colors.grey.shade600)))]),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(Icons.location_on, size: 18, color: AppTheme.primary),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    address.isEmpty ? '—' : address,
+                    style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
+                  ),
+                ),
+              ],
+            ),
           ],
         ),
       ),
     );
   }
 
-  void _showEditDialog(BuildContext context, UserEntity user, LanguageProvider lang) {
-    final nameCtrl = TextEditingController(text: _displayName ?? user.name);
-    final emailCtrl = TextEditingController(text: _displayEmail ?? user.email);
-    final phoneCtrl = TextEditingController(text: _phone);
-    final addressCtrl = TextEditingController(text: _address);
-    final parentNameCtrl = TextEditingController(text: _parentName);
-    final parentPhoneCtrl = TextEditingController(text: _parentPhone);
-    final parentEmailCtrl = TextEditingController(text: _parentEmail);
+  Future<void> _saveStudentProfileEdit({
+    required BuildContext rootContext,
+    required TextEditingController nameCtrl,
+    required TextEditingController addressCtrl,
+    required String phoneLocked,
+    required LanguageProvider lang,
+  }) async {
+    final name = nameCtrl.text.trim();
+    final phone = phoneLocked.trim();
+    final address = addressCtrl.text.trim();
+    if (name.isEmpty) {
+      if (rootContext.mounted) {
+        ScaffoldMessenger.of(rootContext).showSnackBar(
+          SnackBar(content: Text(lang.t('common.nameRequired'))),
+        );
+      }
+      return;
+    }
+
+    final repo = rootContext.read<StudentProfileRepository>();
+    final auth = rootContext.read<AuthProvider>();
+    final result = await repo.updateMyProfile(
+      name: name,
+      phone: phone,
+      address: address,
+    );
+
+    if (!rootContext.mounted) return;
+    final messenger = ScaffoldMessenger.of(rootContext);
+
+    if (result == null) {
+      setState(() {
+        _overrideName = name;
+        _overridePhone = phone;
+        _overrideAddress = address;
+      });
+      messenger.showSnackBar(SnackBar(content: Text(lang.t('common.profileUpdated'))));
+      return;
+    }
+    if (result) {
+      final refreshed = await auth.refreshUserFromServer();
+      if (!refreshed) {
+        await auth.syncUserFromProfile(name: name, phone: phone);
+      }
+      setState(() {
+        _overrideName = null;
+        _overridePhone = null;
+        _overrideAddress = null;
+        _profileFuture = repo.getMyProfile();
+      });
+      messenger.showSnackBar(SnackBar(content: Text(lang.t('common.profileUpdated'))));
+    } else {
+      messenger.showSnackBar(SnackBar(content: Text(lang.t('common.profileUpdateFailed'))));
+    }
+  }
+
+  void _showEditDialog(
+    BuildContext context,
+    UserEntity user,
+    StudentProfileMe? profile,
+    LanguageProvider lang,
+  ) {
+    final nameCtrl = TextEditingController(text: _name(user, profile));
+    final addressCtrl = TextEditingController(text: _address(profile));
+    final phoneLocked = _phone(profile);
 
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
+        insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: Text(_t(lang, 'profile.editProfile', 'Edit Profile')),
         content: ConstrainedBox(
-          constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.6),
+          constraints: BoxConstraints(
+            maxWidth: 420,
+            maxHeight: MediaQuery.of(context).size.height * 0.65,
+          ),
           child: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-              Text(lang.t('profile.personalInfo'), style: Theme.of(context).textTheme.titleSmall),
-              const SizedBox(height: 12),
-              _editField(context, lang.t('profile.fullName'), nameCtrl),
-              _editField(context, lang.t('profile.email'), emailCtrl),
-              _editField(context, lang.t('profile.phone'), phoneCtrl),
-              _editField(context, lang.t('profile.address'), addressCtrl),
-              const Divider(height: 24),
-              Text(lang.t('profile.parentInfo'), style: Theme.of(context).textTheme.titleSmall),
-              const SizedBox(height: 12),
-              _editField(context, lang.t('profile.parentName'), parentNameCtrl),
-              _editField(context, lang.t('profile.parentPhone'), parentPhoneCtrl),
-              _editField(context, lang.t('profile.parentEmail'), parentEmailCtrl),
+                Text(
+                  lang.t('profile.personalInfo'),
+                  style: Theme.of(context).textTheme.titleSmall,
+                ),
+                const SizedBox(height: 12),
+                _editField(context, lang.t('profile.fullName'), nameCtrl),
+                _readOnlyPhoneBlock(context, lang, phoneLocked),
+                _editField(
+                  context,
+                  lang.t('profile.address'),
+                  addressCtrl,
+                  minLines: 2,
+                  maxLines: 4,
+                ),
               ],
             ),
           ),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: Text(lang.t('common.cancel'))),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text(lang.t('common.cancel')),
+          ),
           FilledButton(
-            onPressed: () {
-              setState(() {
-                _displayName = nameCtrl.text.trim().isEmpty ? null : nameCtrl.text.trim();
-                _displayEmail = emailCtrl.text.trim().isEmpty ? null : emailCtrl.text.trim();
-                _phone = phoneCtrl.text;
-                _address = addressCtrl.text;
-                _parentName = parentNameCtrl.text;
-                _parentPhone = parentPhoneCtrl.text;
-                _parentEmail = parentEmailCtrl.text;
-              });
-              Navigator.pop(ctx);
-              if (context.mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(lang.t('common.profileUpdated'))));
+            onPressed: () async {
+              final name = nameCtrl.text.trim();
+              if (name.isEmpty) {
+                ScaffoldMessenger.of(ctx).showSnackBar(
+                  SnackBar(content: Text(lang.t('common.nameRequired'))),
+                );
+                return;
               }
+              Navigator.pop(ctx);
+              await _saveStudentProfileEdit(
+                rootContext: context,
+                nameCtrl: nameCtrl,
+                addressCtrl: addressCtrl,
+                phoneLocked: phoneLocked,
+                lang: lang,
+              );
             },
             child: Text(lang.t('common.saveChanges')),
           ),
@@ -200,35 +428,127 @@ class _StudentProfileScreenState extends State<StudentProfileScreen> {
     );
   }
 
-  Widget _editField(BuildContext context, String label, TextEditingController controller) {
+  Widget _readOnlyPhoneBlock(
+    BuildContext context,
+    LanguageProvider lang,
+    String phone,
+  ) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text(label, style: Theme.of(context).textTheme.labelMedium?.copyWith(color: Colors.grey.shade700)),
-        const SizedBox(height: 4),
-        TextField(
-          controller: controller,
-          decoration: InputDecoration(
-            isDense: true,
-            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: AppTheme.primary.withValues(alpha: 0.3))),
-            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: AppTheme.primary, width: 1.5)),
+      padding: const EdgeInsets.only(bottom: 14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            lang.t('profile.phone'),
+            style: Theme.of(context)
+                .textTheme
+                .labelMedium
+                ?.copyWith(color: Colors.grey.shade700),
           ),
-        ),
-      ]),
+          const SizedBox(height: 6),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+            decoration: BoxDecoration(
+              color: Colors.grey.shade100,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(
+                color: AppTheme.primary.withValues(alpha: 0.2),
+              ),
+            ),
+            child: Text(
+              phone.isEmpty ? '—' : phone,
+              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                    height: 1.35,
+                    color: Colors.grey.shade800,
+                  ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
-  Widget _buildAcademicCard(BuildContext context, LanguageProvider lang, int enrolledCount, int completedAssignments, int totalAssignments) {
+  Widget _editField(
+    BuildContext context,
+    String label,
+    TextEditingController controller, {
+    TextInputType keyboardType = TextInputType.text,
+    int minLines = 1,
+    int maxLines = 1,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: Theme.of(context)
+                .textTheme
+                .labelMedium
+                ?.copyWith(color: Colors.grey.shade700),
+          ),
+          const SizedBox(height: 6),
+          TextField(
+            controller: controller,
+            keyboardType: keyboardType,
+            minLines: minLines,
+            maxLines: maxLines,
+            style: Theme.of(context).textTheme.bodyLarge?.copyWith(height: 1.35),
+            decoration: InputDecoration(
+              isDense: false,
+              contentPadding:
+                  const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide:
+                    BorderSide(color: AppTheme.primary.withValues(alpha: 0.3)),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide:
+                    const BorderSide(color: AppTheme.primary, width: 1.5),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAcademicCard(
+    BuildContext context,
+    LanguageProvider lang,
+    StudentProfileMe? profile,
+  ) {
+    final a = profile?.academic;
+    final totalClasses = a?.totalClasses ?? 0;
+    final assignments = a?.assignmentsDisplay ?? '—';
+    final avg = a?.averageGrade ?? 0;
+    final att = a?.attendance ?? 0;
+
     return Card(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: BorderSide(color: AppTheme.primary.withValues(alpha: 0.2), width: 2)),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: AppTheme.primary.withValues(alpha: 0.2), width: 2),
+      ),
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(children: [Icon(Icons.school, size: 20, color: AppTheme.primary), const SizedBox(width: 8), Text(lang.t('profile.academicOverview'), style: Theme.of(context).textTheme.titleMedium)]),
+            Row(
+              children: [
+                Icon(Icons.school, size: 20, color: AppTheme.primary),
+                const SizedBox(width: 8),
+                Text(
+                  lang.t('profile.academicOverview'),
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+              ],
+            ),
             const SizedBox(height: 12),
             GridView.count(
               shrinkWrap: true,
@@ -238,10 +558,30 @@ class _StudentProfileScreenState extends State<StudentProfileScreen> {
               crossAxisSpacing: 12,
               childAspectRatio: 1.15,
               children: [
-                _StatBox(icon: Icons.menu_book, label: lang.t('classes.enrolledClasses'), value: '$enrolledCount', color: AppTheme.primary),
-                _StatBox(icon: Icons.assignment, label: lang.t('profile.assignments'), value: '$completedAssignments/$totalAssignments', color: AppTheme.secondary),
-                _StatBox(icon: Icons.emoji_events, label: lang.t('profile.averageGrade'), value: '87%', color: AppTheme.accent),
-                _StatBox(icon: Icons.calendar_today, label: lang.t('profile.attendance'), value: '94%', color: AppTheme.primary),
+                _StatBox(
+                  icon: Icons.menu_book,
+                  label: lang.t('profile.totalClasses'),
+                  value: '$totalClasses',
+                  color: AppTheme.primary,
+                ),
+                _StatBox(
+                  icon: Icons.assignment,
+                  label: lang.t('profile.assignments'),
+                  value: assignments,
+                  color: AppTheme.secondary,
+                ),
+                _StatBox(
+                  icon: Icons.emoji_events,
+                  label: lang.t('profile.averageGrade'),
+                  value: _formatPercentStat(avg),
+                  color: AppTheme.accent,
+                ),
+                _StatBox(
+                  icon: Icons.calendar_today,
+                  label: lang.t('profile.attendance'),
+                  value: _formatPercentStat(att),
+                  color: AppTheme.primary,
+                ),
               ],
             ),
           ],
@@ -250,63 +590,101 @@ class _StudentProfileScreenState extends State<StudentProfileScreen> {
     );
   }
 
-  Widget _buildParentCard(BuildContext context, LanguageProvider lang) {
+  Widget _buildCurrentClassesCard(
+    BuildContext context,
+    LanguageProvider lang,
+    StudentProfileMe? profile,
+  ) {
+    final list = profile?.currentClasses ?? [];
+
     return Card(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: BorderSide(color: AppTheme.primary.withValues(alpha: 0.2), width: 2)),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(children: [
-              Icon(Icons.people, size: 20, color: AppTheme.primary),
-              const SizedBox(width: 8),
-              Text(lang.t('profile.parentGuardianContact'), style: Theme.of(context).textTheme.titleMedium?.copyWith(color: AppTheme.primary)),
-            ]),
-            const SizedBox(height: 12),
-            _infoRow(context, '${lang.t('profile.name')}:', _parentName),
-            _infoRow(context, '${lang.t('profile.phone')}:', _parentPhone),
-            _infoRow(context, '${lang.t('profile.email')}:', _parentEmail),
-          ],
-        ),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: AppTheme.primary.withValues(alpha: 0.2), width: 2),
       ),
-    );
-  }
-
-  Widget _infoRow(BuildContext context, String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-        Flexible(child: Text(label, style: TextStyle(fontSize: 14, color: Colors.grey.shade600), overflow: TextOverflow.ellipsis)),
-        const SizedBox(width: 8),
-        Flexible(child: Text(value, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: AppTheme.primary), textAlign: TextAlign.end, overflow: TextOverflow.ellipsis)),
-      ]),
-    );
-  }
-
-  Widget _buildCurrentClassesCard(BuildContext context, LanguageProvider lang, List<ClassEntity> enrolledClasses) {
-    return Card(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: BorderSide(color: AppTheme.primary.withValues(alpha: 0.2), width: 2)),
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(children: [Icon(Icons.menu_book, size: 20, color: AppTheme.primary), const SizedBox(width: 8), Text(lang.t('profile.currentClasses'), style: Theme.of(context).textTheme.titleMedium)]),
+            Row(
+              children: [
+                Icon(Icons.menu_book, size: 20, color: AppTheme.primary),
+                const SizedBox(width: 8),
+                Text(
+                  lang.t('profile.currentClasses'),
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+              ],
+            ),
             const SizedBox(height: 12),
-            ...enrolledClasses.take(6).map((c) => Padding(
+            if (list.isEmpty)
+              Text(
+                _t(lang, 'profile.noCurrentClasses', 'No classes to show.'),
+                style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
+              )
+            else
+              ...list.map(
+                (c) => Padding(
                   padding: const EdgeInsets.only(bottom: 8),
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                    decoration: BoxDecoration(color: AppTheme.primary.withValues(alpha: 0.06), borderRadius: BorderRadius.circular(10), border: Border.all(color: AppTheme.primary.withValues(alpha: 0.1))),
-                    child: Row(children: [
-                      Container(width: 8, height: 8, decoration: const BoxDecoration(color: AppTheme.primary, shape: BoxShape.circle)),
-                      const SizedBox(width: 10),
-                      Expanded(child: Text(c.name, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500))),
-                      Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4), decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(6), border: Border.all(color: AppTheme.primary.withValues(alpha: 0.2))), child: Text(c.teacher, style: const TextStyle(fontSize: 10))),
-                    ]),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 10,
+                    ),
+                    decoration: BoxDecoration(
+                      color: AppTheme.primary.withValues(alpha: 0.06),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                        color: AppTheme.primary.withValues(alpha: 0.1),
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 8,
+                          height: 8,
+                          decoration: const BoxDecoration(
+                            color: AppTheme.primary,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            c.subject,
+                            style: const TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w500,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(
+                              color: AppTheme.primary.withValues(alpha: 0.2),
+                            ),
+                          ),
+                          child: Text(
+                            c.teacherName,
+                            style: const TextStyle(fontSize: 10),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                )),
+                ),
+              ),
           ],
         ),
       ),
@@ -338,73 +716,64 @@ class _StudentProfileScreenState extends State<StudentProfileScreen> {
       ),
     );
   }
-
-  Widget _buildAchievementsCard(BuildContext context, LanguageProvider lang) {
-    // Colors matching design: bg, icon, title for each achievement
-    const Color greenBg = Color(0xFFE8F8E8);
-    const Color greenIcon = Color(0xFF66BB6A);
-    const Color greenTitle = Color(0xFF388E3C);
-    const Color goldBg = Color(0xFFFFFBEB);
-    const Color goldIcon = Color(0xFFFFC107);
-    const Color goldTitle = Color(0xFFFFA000);
-    const Color blueBg = Color(0xFFEBF0FA);
-    const Color blueIcon = Color(0xFF42A5F5);
-    const Color blueTitle = Color(0xFF1976D2);
-    const Color subtitleGrey = Color(0xFF616161);
-    const Color headerGreen = Color(0xFF4CAF50);
-    const Color headerText = Color(0xFF333333);
-
-    final achievements = [
-      ('Perfect Attendance', 'December 2025', greenBg, greenIcon, greenTitle),
-      ('Top Grade in Mathematics', 'Final Exam - 95%', goldBg, goldIcon, goldTitle),
-      ('Outstanding Project', 'Science Fair Winner', blueBg, blueIcon, blueTitle),
-    ];
-    return Card(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: BorderSide(color: AppTheme.primary.withValues(alpha: 0.2), width: 2)),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(children: [Icon(Icons.check_circle, size: 20, color: headerGreen), const SizedBox(width: 8), Text(lang.t('profile.recentAchievements'), style: Theme.of(context).textTheme.titleMedium?.copyWith(color: headerText))]),
-            const SizedBox(height: 12),
-            ...achievements.map((a) => Padding(
-                  padding: const EdgeInsets.only(bottom: 8),
-                  child: Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(color: a.$3, borderRadius: BorderRadius.circular(10)),
-                    child: Row(children: [
-                      Icon(Icons.emoji_events, size: 22, color: a.$4),
-                      const SizedBox(width: 12),
-                      Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(a.$1, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: a.$5)), Text(a.$2, style: const TextStyle(fontSize: 12, color: subtitleGrey))])),
-                    ]),
-                  ),
-                )),
-          ],
-        ),
-      ),
-    );
-  }
 }
 
 class _StatBox extends StatelessWidget {
+  const _StatBox({
+    required this.icon,
+    required this.label,
+    required this.value,
+    required this.color,
+  });
+
   final IconData icon;
   final String label;
   final String value;
   final Color color;
 
-  const _StatBox({required this.icon, required this.label, required this.value, required this.color});
-
   @override
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-      decoration: BoxDecoration(color: color.withValues(alpha: 0.06), borderRadius: BorderRadius.circular(10), border: Border.all(color: color.withValues(alpha: 0.2))),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisAlignment: MainAxisAlignment.center, mainAxisSize: MainAxisSize.min, children: [
-        Row(children: [Icon(icon, size: 16, color: color), const SizedBox(width: 4), Expanded(child: Text(label, style: TextStyle(fontSize: 10, color: Colors.grey.shade600), maxLines: 1, overflow: TextOverflow.ellipsis))]),
-        const SizedBox(height: 4),
-        Text(value, style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
-      ]),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: color.withValues(alpha: 0.2)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.center,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            children: [
+              Icon(icon, size: 16, color: color),
+              const SizedBox(width: 4),
+              Expanded(
+                child: Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 10,
+                    color: Colors.grey.shade600,
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            value,
+            style: Theme.of(context)
+                .textTheme
+                .titleMedium
+                ?.copyWith(fontWeight: FontWeight.bold),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ],
+      ),
     );
   }
 }

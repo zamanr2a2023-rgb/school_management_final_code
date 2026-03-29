@@ -8,7 +8,41 @@ import 'package:high_school/domain/entities/lesson_entity.dart';
 import 'package:high_school/domain/repositories/assignments_repository.dart';
 import 'package:high_school/domain/repositories/classes_repository.dart';
 import 'package:high_school/domain/repositories/lessons_repository.dart';
+import 'package:high_school/domain/repositories/student_classes_repository.dart';
 import 'package:high_school/presentation/providers/language_provider.dart';
+
+class _ClassDetailsLoaded {
+  const _ClassDetailsLoaded({
+    required this.cls,
+    required this.lessons,
+    required this.assignments,
+  });
+  final ClassEntity? cls;
+  final List<LessonEntity> lessons;
+  final List<AssignmentEntity> assignments;
+}
+
+Future<_ClassDetailsLoaded> _loadStudentClassDetails({
+  required String classId,
+  required ClassEntity? passedClass,
+  required StudentClassesRepository studentClassesRepo,
+  required ClassesRepository classesRepo,
+  required LessonsRepository lessonsRepo,
+  required AssignmentsRepository assignmentsRepo,
+}) async {
+  final detail = await studentClassesRepo.getStudentClassDetail(classId);
+  if (detail != null) {
+    return _ClassDetailsLoaded(
+      cls: detail.classEntity,
+      lessons: detail.lessons,
+      assignments: detail.assignments,
+    );
+  }
+  final cls = passedClass ?? await classesRepo.getClassById(classId);
+  final lessons = await lessonsRepo.getLessons(classId: classId);
+  final assignments = await assignmentsRepo.getAssignments(classId: classId);
+  return _ClassDetailsLoaded(cls: cls, lessons: lessons, assignments: assignments);
+}
 
 class ClassDetailsScreen extends StatelessWidget {
   const ClassDetailsScreen({
@@ -18,6 +52,7 @@ class ClassDetailsScreen extends StatelessWidget {
   });
 
   final String classId;
+
   /// When provided (e.g. navigated from classes list API), use this instead of fetching by id.
   final ClassEntity? passedClass;
 
@@ -30,18 +65,26 @@ class ClassDetailsScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final lang = context.watch<LanguageProvider>();
 
-    return FutureBuilder(
-      future: Future.wait([
-        passedClass != null ? Future<ClassEntity?>.value(passedClass) : context.read<ClassesRepository>().getClassById(classId),
-        context.read<LessonsRepository>().getLessons(classId: classId),
-        context.read<AssignmentsRepository>().getAssignments(classId: classId),
-      ]),
+    return FutureBuilder<_ClassDetailsLoaded>(
+      future: _loadStudentClassDetails(
+        classId: classId,
+        passedClass: passedClass,
+        studentClassesRepo: context.read<StudentClassesRepository>(),
+        classesRepo: context.read<ClassesRepository>(),
+        lessonsRepo: context.read<LessonsRepository>(),
+        assignmentsRepo: context.read<AssignmentsRepository>(),
+      ),
       builder: (context, snapshot) {
-        if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
-        final cls = snapshot.data![0] as ClassEntity?;
-        final lessons = (snapshot.data![1] as List).cast<LessonEntity>();
-        final assignments = (snapshot.data![2] as List).cast<AssignmentEntity>();
-        if (cls == null) return Center(child: Text(lang.t('classes.classNotFound')));
+        if (!snapshot.hasData) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        final loaded = snapshot.data!;
+        final cls = loaded.cls;
+        final lessons = loaded.lessons;
+        final assignments = loaded.assignments;
+        if (cls == null) {
+          return Center(child: Text(lang.t('classes.classNotFound')));
+        }
 
         final primaryColor = _colorFromHex(cls.color);
         final primaryColorDark = primaryColor.withValues(alpha: 0.85);
@@ -56,8 +99,8 @@ class ClassDetailsScreen extends StatelessWidget {
                 // Class header – gradient banner (compact)
                 Container(
                   width: double.infinity,
-                
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
                       begin: Alignment.topLeft,
@@ -77,76 +120,126 @@ class ClassDetailsScreen extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Text(cls.name, style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                      Text(
+                        cls.name,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
                       const SizedBox(height: 2),
-                      Text(cls.teacher, style: TextStyle(color: Colors.white.withValues(alpha: 0.9), fontSize: 13)),
+                      Text(
+                        cls.teacher,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.9),
+                          fontSize: 13,
+                        ),
+                      ),
                       const SizedBox(height: 6),
-                      Wrap(
-                        spacing: 10,
-                        runSpacing: 2,
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Row(mainAxisSize: MainAxisSize.min, children: [
-                            Icon(Icons.calendar_today, size: 12, color: Colors.white.withValues(alpha: 0.9)),
-                            const SizedBox(width: 4),
-                            Text(cls.schedule, style: TextStyle(color: Colors.white.withValues(alpha: 0.95), fontSize: 11)),
-                          ]),
-                          Row(mainAxisSize: MainAxisSize.min, children: [
-                            Icon(Icons.people, size: 12, color: Colors.white.withValues(alpha: 0.9)),
-                            const SizedBox(width: 4),
-                            Text('${cls.students} ${lang.t('classes.students')}', style: TextStyle(color: Colors.white.withValues(alpha: 0.95), fontSize: 11)),
-                          ]),
+                          Padding(
+                            padding: const EdgeInsets.only(top: 1),
+                            child: Icon(
+                              Icons.calendar_today,
+                              size: 12,
+                              color: Colors.white.withValues(alpha: 0.9),
+                            ),
+                          ),
+                          const SizedBox(width: 4),
+                          Expanded(
+                            child: Text(
+                              cls.schedule,
+                              maxLines: 3,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: Colors.white.withValues(alpha: 0.95),
+                                fontSize: 11,
+                                height: 1.25,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.people,
+                            size: 12,
+                            color: Colors.white.withValues(alpha: 0.9),
+                          ),
+                          const SizedBox(width: 4),
+                          Flexible(
+                            child: Text(
+                              '${cls.students} ${lang.t('classes.students')}',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: Colors.white.withValues(alpha: 0.95),
+                                fontSize: 11,
+                              ),
+                            ),
+                          ),
                         ],
                       ),
                     ],
                   ),
                 ),
-              const SizedBox(height: 16),
-              // Tabs
-              TabBar(
-                labelColor: AppTheme.primary,
-                unselectedLabelColor: Colors.grey.shade600,
-                indicatorColor: AppTheme.primary,
-                tabs: [
-                  Tab(
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.menu_book, size: 18),
-                        const SizedBox(width: 6),
-                        Text(lang.t('lessons.lessons'), style: const TextStyle(fontSize: 13)),
-                      ],
+                const SizedBox(height: 16),
+                // Tabs
+                TabBar(
+                  labelColor: AppTheme.primary,
+                  unselectedLabelColor: Colors.grey.shade600,
+                  indicatorColor: AppTheme.primary,
+                  tabs: [
+                    Tab(
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.menu_book, size: 18),
+                          const SizedBox(width: 6),
+                          Text(lang.t('lessons.lessons'),
+                              style: const TextStyle(fontSize: 13)),
+                        ],
+                      ),
                     ),
-                  ),
-                  Tab(
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.assignment, size: 18),
-                        const SizedBox(width: 6),
-                        Text(lang.t('assignments.assignments'), style: const TextStyle(fontSize: 13)),
-                      ],
+                    Tab(
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.assignment, size: 18),
+                          const SizedBox(width: 6),
+                          Text(lang.t('assignments.assignments'),
+                              style: const TextStyle(fontSize: 13)),
+                        ],
+                      ),
                     ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              Expanded(
-                child: TabBarView(
-                  children: [
-                    _LessonsTab(lessons: lessons, lang: lang),
-                    _AssignmentsTab(assignments: assignments, lang: lang),
                   ],
                 ),
-              ),
-            ],
+                const SizedBox(height: 12),
+                Expanded(
+                  child: TabBarView(
+                    children: [
+                      _LessonsTab(lessons: lessons, lang: lang),
+                      _AssignmentsTab(assignments: assignments, lang: lang),
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ),
-        ),
         );
       },
     );
   }
 }
-
 
 class _LessonsTab extends StatelessWidget {
   const _LessonsTab({required this.lessons, required this.lang});
@@ -185,9 +278,11 @@ class _LessonsTab extends StatelessWidget {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(Icons.menu_book, size: 48, color: AppTheme.primary.withValues(alpha: 0.4)),
+              Icon(Icons.menu_book,
+                  size: 48, color: AppTheme.primary.withValues(alpha: 0.4)),
               const SizedBox(height: 12),
-              Text(lang.t('lessons.noLessonsAvailable'), style: TextStyle(fontSize: 14, color: Colors.grey.shade600)),
+              Text(lang.t('lessons.noLessonsAvailable'),
+                  style: TextStyle(fontSize: 14, color: Colors.grey.shade600)),
             ],
           ),
         ),
@@ -205,13 +300,14 @@ class _LessonsTab extends StatelessWidget {
             color: Colors.white,
             borderRadius: BorderRadius.circular(12),
             child: InkWell(
-              onTap: () => context.go('/student/lessons/${l.id}'),
+              onTap: () => context.push('/student/lessons/${l.id}'),
               borderRadius: BorderRadius.circular(12),
               child: Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: AppTheme.primary.withValues(alpha: 0.2)),
+                  border: Border.all(
+                      color: AppTheme.primary.withValues(alpha: 0.2)),
                 ),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -222,43 +318,72 @@ class _LessonsTab extends StatelessWidget {
                         color: AppTheme.primary.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(8),
                       ),
-                      child: Icon(_iconForType(l.type), size: 22, color: AppTheme.primary),
+                      child: Icon(_iconForType(l.type),
+                          size: 22, color: AppTheme.primary),
                     ),
                     const SizedBox(width: 12),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(l.title, style: Theme.of(context).textTheme.titleSmall?.copyWith(color: AppTheme.primary, fontWeight: FontWeight.w600), maxLines: 1, overflow: TextOverflow.ellipsis),
+                          Text(l.title,
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .titleSmall
+                                  ?.copyWith(
+                                      color: AppTheme.primary,
+                                      fontWeight: FontWeight.w600),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis),
                           const SizedBox(height: 4),
-                          Text(l.description, style: TextStyle(fontSize: 12, color: Colors.grey.shade700), maxLines: 2, overflow: TextOverflow.ellipsis),
+                          Text(l.description,
+                              style: TextStyle(
+                                  fontSize: 12, color: Colors.grey.shade700),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis),
                           const SizedBox(height: 8),
                           Wrap(
                             spacing: 10,
                             runSpacing: 4,
                             children: [
                               Row(mainAxisSize: MainAxisSize.min, children: [
-                                Icon(Icons.calendar_today, size: 12, color: Colors.grey.shade600),
+                                Icon(Icons.calendar_today,
+                                    size: 12, color: Colors.grey.shade600),
                                 const SizedBox(width: 4),
-                                Text(_formatDate(l.date), style: TextStyle(fontSize: 11, color: Colors.grey.shade600)),
+                                Text(_formatDate(l.date),
+                                    style: TextStyle(
+                                        fontSize: 11,
+                                        color: Colors.grey.shade600)),
                               ]),
                               if (l.duration != null && l.duration!.isNotEmpty)
                                 Row(mainAxisSize: MainAxisSize.min, children: [
-                                  Icon(Icons.access_time, size: 12, color: Colors.grey.shade600),
+                                  Icon(Icons.access_time,
+                                      size: 12, color: Colors.grey.shade600),
                                   const SizedBox(width: 4),
-                                  Text(l.duration!, style: TextStyle(fontSize: 11, color: Colors.grey.shade600)),
+                                  Text(l.duration!,
+                                      style: TextStyle(
+                                          fontSize: 11,
+                                          color: Colors.grey.shade600)),
                                 ]),
                               Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                decoration: BoxDecoration(color: Colors.grey.shade200, borderRadius: BorderRadius.circular(4)),
-                                child: Text(_typeLabel(l.type), style: TextStyle(fontSize: 10, color: Colors.grey.shade700)),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                    color: Colors.grey.shade200,
+                                    borderRadius: BorderRadius.circular(4)),
+                                child: Text(_typeLabel(l.type),
+                                    style: TextStyle(
+                                        fontSize: 10,
+                                        color: Colors.grey.shade700)),
                               ),
                             ],
                           ),
                         ],
                       ),
                     ),
-                    Icon(Icons.chevron_right, size: 20, color: AppTheme.primary.withValues(alpha: 0.8)),
+                    Icon(Icons.chevron_right,
+                        size: 20,
+                        color: AppTheme.primary.withValues(alpha: 0.8)),
                   ],
                 ),
               ),
@@ -273,7 +398,20 @@ class _LessonsTab extends StatelessWidget {
     try {
       final parts = dateStr.split('-');
       if (parts.length >= 3) {
-        const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        const months = [
+          'Jan',
+          'Feb',
+          'Mar',
+          'Apr',
+          'May',
+          'Jun',
+          'Jul',
+          'Aug',
+          'Sep',
+          'Oct',
+          'Nov',
+          'Dec'
+        ];
         final m = int.tryParse(parts[1]);
         final d = parts[2].length > 2 ? parts[2].substring(0, 2) : parts[2];
         if (m != null && m >= 1 && m <= 12) return '${months[m - 1]} $d';
@@ -298,9 +436,11 @@ class _AssignmentsTab extends StatelessWidget {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(Icons.assignment, size: 48, color: AppTheme.primary.withValues(alpha: 0.4)),
+              Icon(Icons.assignment,
+                  size: 48, color: AppTheme.primary.withValues(alpha: 0.4)),
               const SizedBox(height: 12),
-              Text(lang.t('assignments.noAssignmentsAvailable'), style: TextStyle(fontSize: 14, color: Colors.grey.shade600)),
+              Text(lang.t('assignments.noAssignmentsAvailable'),
+                  style: TextStyle(fontSize: 14, color: Colors.grey.shade600)),
             ],
           ),
         ),
@@ -328,7 +468,8 @@ class _AssignmentsTab extends StatelessWidget {
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: AppTheme.primary.withValues(alpha: 0.2)),
+                  border: Border.all(
+                      color: AppTheme.primary.withValues(alpha: 0.2)),
                 ),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -337,39 +478,74 @@ class _AssignmentsTab extends StatelessWidget {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(a.title, style: Theme.of(context).textTheme.titleSmall?.copyWith(color: AppTheme.primary, fontWeight: FontWeight.w600)),
+                          Text(a.title,
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .titleSmall
+                                  ?.copyWith(
+                                      color: AppTheme.primary,
+                                      fontWeight: FontWeight.w600)),
                           const SizedBox(height: 4),
-                          Text(a.description, style: TextStyle(fontSize: 12, color: Colors.grey.shade700), maxLines: 2, overflow: TextOverflow.ellipsis),
+                          Text(a.description,
+                              style: TextStyle(
+                                  fontSize: 12, color: Colors.grey.shade700),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis),
                           const SizedBox(height: 8),
                           Wrap(
                             spacing: 8,
                             runSpacing: 4,
                             children: [
                               Row(mainAxisSize: MainAxisSize.min, children: [
-                                Icon(Icons.calendar_today, size: 12, color: Colors.grey.shade600),
+                                Icon(Icons.calendar_today,
+                                    size: 12, color: Colors.grey.shade600),
                                 const SizedBox(width: 4),
-                                Text('${lang.t('assignments.dueDate')} ${_formatDate(a.dueDate)}', style: TextStyle(fontSize: 11, color: Colors.grey.shade600)),
+                                Text(
+                                    '${lang.t('assignments.dueDate')} ${_formatDate(a.dueDate)}',
+                                    style: TextStyle(
+                                        fontSize: 11,
+                                        color: Colors.grey.shade600)),
                               ]),
                               Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                decoration: BoxDecoration(color: Colors.amber.shade100, borderRadius: BorderRadius.circular(4)),
-                                child: Text('${a.points} pts', style: TextStyle(fontSize: 10, color: Colors.amber.shade900)),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                    color: Colors.amber.shade100,
+                                    borderRadius: BorderRadius.circular(4)),
+                                child: Text('${a.points} pts',
+                                    style: TextStyle(
+                                        fontSize: 10,
+                                        color: Colors.amber.shade900)),
                               ),
                               Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                decoration: BoxDecoration(color: statusColor.withValues(alpha: 0.2), borderRadius: BorderRadius.circular(4)),
-                                child: Text(_statusLabel(a.status), style: TextStyle(fontSize: 10, color: statusColor, fontWeight: FontWeight.w500)),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                    color: statusColor.withValues(alpha: 0.2),
+                                    borderRadius: BorderRadius.circular(4)),
+                                child: Text(_statusLabel(a.status),
+                                    style: TextStyle(
+                                        fontSize: 10,
+                                        color: statusColor,
+                                        fontWeight: FontWeight.w500)),
                               ),
                             ],
                           ),
                           if (a.grade != null) ...[
                             const SizedBox(height: 6),
-                            Text('${lang.t('assignments.score')}: ${a.grade}/${a.points}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF2E7D32))),
+                            Text(
+                                '${lang.t('assignments.score')}: ${a.grade}/${a.points}',
+                                style: const TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    color: Color(0xFF2E7D32))),
                           ],
                         ],
                       ),
                     ),
-                    Icon(Icons.chevron_right, size: 20, color: AppTheme.primary.withValues(alpha: 0.8)),
+                    Icon(Icons.chevron_right,
+                        size: 20,
+                        color: AppTheme.primary.withValues(alpha: 0.8)),
                   ],
                 ),
               ),
@@ -395,7 +571,20 @@ class _AssignmentsTab extends StatelessWidget {
     try {
       final parts = dateStr.split('-');
       if (parts.length >= 3) {
-        const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        const months = [
+          'Jan',
+          'Feb',
+          'Mar',
+          'Apr',
+          'May',
+          'Jun',
+          'Jul',
+          'Aug',
+          'Sep',
+          'Oct',
+          'Nov',
+          'Dec'
+        ];
         final m = int.tryParse(parts[1]);
         final d = parts[2].length > 2 ? parts[2].substring(0, 2) : parts[2];
         if (m != null && m >= 1 && m <= 12) return '${months[m - 1]} $d';

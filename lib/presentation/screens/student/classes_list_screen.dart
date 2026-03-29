@@ -195,61 +195,66 @@ class _SubjectCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
         side: BorderSide(color: AppTheme.primary.withValues(alpha: 0.2), width: 2),
       ),
-      child: InkWell(
-        onTap: () => context.push('/student/classes/${first.id}', extra: first),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Gradient header with subject name (match React)
-            Container(
-              width: double.infinity,
-              height: 80,
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [
-                    AppTheme.primary,
-                    AppTheme.primary.withValues(alpha: 0.85),
-                  ],
-                ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: double.infinity,
+            height: 80,
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  AppTheme.primary,
+                  AppTheme.primary.withValues(alpha: 0.85),
+                ],
               ),
-              child: Align(
-                alignment: Alignment.bottomLeft,
-                child: Text(
-                  subject,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                  ),
+            ),
+            child: Align(
+              alignment: Alignment.bottomLeft,
+              child: Text(
+                subject,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
                 ),
               ),
             ),
-            Padding(
-              padding: const EdgeInsets.all(12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Icon(Icons.menu_book, size: 14, color: AppTheme.primary),
-                      const SizedBox(width: 6),
-                      Text(first.teacher, style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
-                    ],
-                  ),
-                  const SizedBox(height: 6),
-                  Row(
-                    children: [
-                      Icon(Icons.people, size: 14, color: AppTheme.primary),
-                      const SizedBox(width: 6),
-                      Text(
-                        '$totalStudents ${lang.t('classes.students')}',
+          ),
+          Padding(
+            padding: const EdgeInsets.all(12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(Icons.menu_book, size: 14, color: AppTheme.primary),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        first.teacher,
                         style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                Row(
+                  children: [
+                    Icon(Icons.people, size: 14, color: AppTheme.primary),
+                    const SizedBox(width: 6),
+                    Text(
+                      '$totalStudents ${lang.t('classes.students')}',
+                      style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                    ),
+                  ],
+                ),
+                if (classes.length > 1) ...[
                   const SizedBox(height: 10),
                   Wrap(
                     spacing: 6,
@@ -266,31 +271,62 @@ class _SubjectCard extends StatelessWidget {
                             ))
                         .toList(),
                   ),
-                  const SizedBox(height: 12),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: () => context.push('/student/classes/${first.id}', extra: first),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppTheme.primary,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 10),
-                      ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Text(lang.t('classes.viewClass')),
-                          const SizedBox(width: 6),
-                          const Icon(Icons.chevron_right, size: 18),
-                        ],
+                ],
+                const SizedBox(height: 12),
+                ...classes.map((c) {
+                  final label = c.level.isNotEmpty ? c.level : c.name;
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Material(
+                      color: Colors.grey.shade50,
+                      borderRadius: BorderRadius.circular(8),
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(8),
+                        onTap: () => context.push('/student/classes/${c.id}', extra: c),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      label,
+                                      style: const TextStyle(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w600,
+                                        color: AppTheme.primary,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      '${c.students} ${lang.t('classes.students')}',
+                                      style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              Text(
+                                lang.t('classes.viewClass'),
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  color: AppTheme.primary,
+                                ),
+                              ),
+                              Icon(Icons.chevron_right, size: 20, color: AppTheme.primary.withValues(alpha: 0.8)),
+                            ],
+                          ),
+                        ),
                       ),
                     ),
-                  ),
-                ],
-              ),
+                  );
+                }),
+              ],
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

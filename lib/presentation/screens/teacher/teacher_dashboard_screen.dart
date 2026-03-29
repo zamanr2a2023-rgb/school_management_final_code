@@ -3,17 +3,15 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:high_school/core/theme/app_theme.dart';
 import 'package:high_school/domain/entities/class_entity.dart';
-import 'package:high_school/domain/entities/assignment_entity.dart';
 import 'package:high_school/domain/entities/live_session_entity.dart';
-import 'package:high_school/domain/entities/lesson_entity.dart';
 import 'package:high_school/domain/entities/timetable_entity.dart';
 import 'package:high_school/domain/entities/teacher_dashboard_entity.dart';
 import 'package:high_school/domain/repositories/classes_repository.dart';
 import 'package:high_school/domain/repositories/timetable_repository.dart';
 import 'package:high_school/domain/repositories/live_sessions_repository.dart';
+import 'package:high_school/domain/repositories/teacher_classes_repository.dart';
 import 'package:high_school/domain/repositories/teacher_dashboard_repository.dart';
-import 'package:high_school/domain/repositories/lessons_repository.dart';
-import 'package:high_school/domain/repositories/assignments_repository.dart';
+import 'package:high_school/presentation/screens/teacher/teacher_lesson_assignment_dialogs.dart';
 import 'package:high_school/data/datasources/mock_data.dart';
 import 'package:high_school/presentation/providers/auth_provider.dart';
 import 'package:high_school/presentation/providers/language_provider.dart';
@@ -193,8 +191,8 @@ class TeacherDashboardScreen extends StatelessWidget {
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton.icon(
-                    onPressed: () =>
-                        _showCreateLessonDialog(context, lang, myClasses),
+                    onPressed: () => _showPickClassForQuickAction(
+                        context, lang, myClasses, forLesson: true),
                     icon: const Icon(Icons.add, size: 18),
                     label: Text(lang.t('actions.createLesson')),
                     style: ElevatedButton.styleFrom(
@@ -207,8 +205,8 @@ class TeacherDashboardScreen extends StatelessWidget {
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton.icon(
-                    onPressed: () =>
-                        _showCreateAssignmentDialog(context, lang, myClasses),
+                    onPressed: () => _showPickClassForQuickAction(
+                        context, lang, myClasses, forLesson: false),
                     icon: const Icon(Icons.assignment, size: 18),
                     label: Text(lang.t('actions.createAssignment')),
                     style: ElevatedButton.styleFrom(backgroundColor: AppTheme.accent, foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(vertical: 12)),
@@ -565,639 +563,62 @@ class TeacherDashboardScreen extends StatelessWidget {
     );
   }
 
-  void _showCreateLessonDialog(
-      BuildContext context, LanguageProvider lang, List<ClassEntity> myClasses) {
-    const labelColor = Color(0xFF1F3C88);
-    const borderColor = Color(0xFFD1D5DB);
-
-    String title = '';
-    String description = '';
-    String type = 'text';
-    String module = '';
-    String grade = '';
-    String subject = 'Mathematics';
-    String date = DateTime.now().toIso8601String().split('T').first;
-    String? attachedFileName;
-    String selectedClassId =
-        myClasses.isNotEmpty ? myClasses.first.id : '';
-
-    Widget dialogLabel(String text) => Padding(
-          padding: const EdgeInsets.only(bottom: 4),
-          child: Text(
-            text,
-            style: const TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-              color: labelColor,
-            ),
-          ),
-        );
-
-    InputDecoration inputDecoration(String hint) => InputDecoration(
-          hintText: hint,
-          hintStyle: TextStyle(color: Colors.grey.shade500, fontSize: 14),
-          border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: const BorderSide(color: borderColor)),
-          enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: const BorderSide(color: borderColor)),
-          contentPadding:
-              const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-        );
-
-    const gradeOptions = ['4th', '5th', '6th', '7th'];
-    const subjectOptions = [
-      'Mathematics',
-      'Physics',
-      'Chemistry',
-      'SVT',
-      'French',
-      'Arabic',
-      'English'
-    ];
-
-    void submitLesson(LessonStatus status) {
-      if (selectedClassId.isEmpty) return;
-      final lessonType = type == 'video'
-          ? LessonType.video
-          : (type == 'pdf' ? LessonType.pdf : LessonType.text);
-      final nowStr = DateTime.now().toIso8601String().split('T').first;
-      final clsId = selectedClassId;
-
-      context.read<LessonsRepository>().addLesson(LessonEntity(
-            id: 'lesson-${DateTime.now().millisecondsSinceEpoch}',
-            classId: clsId,
-            title: title,
-            description: description,
-            type: lessonType,
-            content: '',
-            date: date,
-            status: status,
-            lastUpdated: nowStr,
-            module: module.isEmpty ? null : module,
-          ));
-      Navigator.pop(context);
-    }
-
-    showDialog(
-      context: context,
-      builder: (ctx) {
-        final screenWidth = MediaQuery.sizeOf(ctx).width;
-        final dialogWidth = (screenWidth > 420) ? 400.0 : (screenWidth - 24);
-        return StatefulBuilder(
-          builder: (ctx, setDialogState) {
-            return Dialog(
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12)),
-              child: Container(
-                width: dialogWidth,
-                constraints: BoxConstraints(
-                  maxWidth: dialogWidth,
-                  maxHeight: MediaQuery.of(ctx).size.height * 0.85,
-                ),
-                padding: const EdgeInsets.fromLTRB(16, 16, 16, 20),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            lang.t('teacherClassDetails.createLesson'),
-                            style: const TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                                color: labelColor),
-                          ),
-                        ),
-                        IconButton(
-                          onPressed: () => Navigator.pop(ctx),
-                          icon: const Icon(Icons.close,
-                              color: labelColor, size: 24),
-                          padding: EdgeInsets.zero,
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                    Flexible(
-                      child: SingleChildScrollView(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            dialogLabel(
-                                '${lang.t('teacherClassDetails.lessonTitle')} *'),
-                            TextField(
-                              decoration: inputDecoration(
-                                  'e.g., Introduction to Algebra'),
-                              onChanged: (v) => title = v,
-                            ),
-                            const SizedBox(height: 12),
-                            dialogLabel(
-                                '${lang.t('teacherClassDetails.contentType')} *'),
-                            DropdownButtonFormField<String>(
-                              value: type,
-                              decoration: inputDecoration('').copyWith(
-                                  contentPadding: const EdgeInsets.symmetric(
-                                      horizontal: 12, vertical: 10)),
-                              items: ['text', 'pdf', 'video']
-                                  .map((e) => DropdownMenuItem(
-                                        value: e,
-                                        child: Text(e == 'text'
-                                            ? 'Text / PDF'
-                                            : e),
-                                      ))
-                                  .toList(),
-                              onChanged: (v) =>
-                                  setDialogState(() => type = v ?? 'text'),
-                            ),
-                            const SizedBox(height: 12),
-                            dialogLabel(lang.t('lessons.description')),
-                            TextField(
-                              decoration: inputDecoration(
-                                  'Describe the lesson content...'),
-                              maxLines: 3,
-                              onChanged: (v) => description = v,
-                            ),
-                            const SizedBox(height: 12),
-                            dialogLabel(
-                                '${lang.t('teacherClassDetails.chapter')} *'),
-                            TextField(
-                              decoration: inputDecoration(
-                                  'e.g., Chapter 3: Equations'),
-                              onChanged: (v) => module = v,
-                            ),
-                            const SizedBox(height: 12),
-                            Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      dialogLabel(
-                                          '${lang.t('live.grade')} *'),
-                                      DropdownButtonFormField<String>(
-                                        value: grade.isEmpty
-                                            ? null
-                                            : (gradeOptions.contains(grade)
-                                                ? grade
-                                                : null),
-                                        decoration: inputDecoration(
-                                                'Select grade')
-                                            .copyWith(
-                                                contentPadding:
-                                                    const EdgeInsets
-                                                        .symmetric(
-                                                        horizontal: 12,
-                                                        vertical: 10)),
-                                        isExpanded: true,
-                                        items: gradeOptions
-                                            .map((g) => DropdownMenuItem(
-                                                value: g,
-                                                child: Text('$g Grade')))
-                                            .toList(),
-                                        onChanged: (v) => setDialogState(
-                                            () => grade = v ?? ''),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      dialogLabel(
-                                          '${lang.t('live.subject')} *'),
-                                      DropdownButtonFormField<String>(
-                                        value: subject,
-                                        decoration: inputDecoration('')
-                                            .copyWith(
-                                                contentPadding:
-                                                    const EdgeInsets
-                                                        .symmetric(
-                                                        horizontal: 12,
-                                                        vertical: 10)),
-                                        isExpanded: true,
-                                        items: subjectOptions
-                                            .map((s) => DropdownMenuItem(
-                                                value: s, child: Text(s)))
-                                            .toList(),
-                                        onChanged: (v) => setDialogState(
-                                            () =>
-                                                subject = v ?? 'Mathematics'),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 12),
-                            dialogLabel(
-                                '${lang.t('classes.classDetails')} *'),
-                            DropdownButtonFormField<String>(
-                              value: selectedClassId.isEmpty
-                                  ? null
-                                  : selectedClassId,
-                              decoration: inputDecoration('Select class')
-                                  .copyWith(
-                                      contentPadding:
-                                          const EdgeInsets.symmetric(
-                                              horizontal: 12, vertical: 10)),
-                              isExpanded: true,
-                              items: myClasses
-                                  .map((c) => DropdownMenuItem(
-                                        value: c.id,
-                                        child: Text(c.name),
-                                      ))
-                                  .toList(),
-                              onChanged: (v) => setDialogState(
-                                  () => selectedClassId = v ?? ''),
-                            ),
-                            const SizedBox(height: 12),
-                            dialogLabel('${lang.t('live.date')} *'),
-                            TextField(
-                              decoration: inputDecoration('Pick a date')
-                                  .copyWith(
-                                      prefixIcon: Icon(Icons.calendar_today,
-                                          size: 20,
-                                          color: Colors.grey.shade600)),
-                              onChanged: (v) => date = v,
-                              controller:
-                                  TextEditingController(text: date),
-                            ),
-                            const SizedBox(height: 12),
-                            dialogLabel(lang.t(
-                                'teacherClassDetails.attachFiles')),
-                            GestureDetector(
-                              onTap: () {},
-                              child: Container(
-                                width: double.infinity,
-                                padding:
-                                    const EdgeInsets.symmetric(vertical: 24),
-                                decoration: BoxDecoration(
-                                  border: Border.all(
-                                      color: borderColor, width: 2),
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: Column(
-                                  children: [
-                                    Icon(Icons.upload_file,
-                                        size: 36, color: labelColor),
-                                    const SizedBox(height: 8),
-                                    Text(
-                                      attachedFileName ??
-                                          'Click to upload PDF or documents',
-                                      style: TextStyle(
-                                        fontSize: 13,
-                                        color: (attachedFileName ?? '')
-                                                .isEmpty
-                                            ? Colors.grey.shade600
-                                            : labelColor,
-                                      ),
-                                      textAlign: TextAlign.center,
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                    Wrap(
-                      alignment: WrapAlignment.end,
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: [
-                        OutlinedButton(
-                          onPressed: () => Navigator.pop(ctx),
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: labelColor,
-                            side: const BorderSide(color: Color(0xFF90CAF9)),
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 12, vertical: 10),
-                          ),
-                          child: Text(
-                            lang.t('common.cancel'),
-                            style: const TextStyle(fontSize: 13),
-                          ),
-                        ),
-                        OutlinedButton(
-                          onPressed: () =>
-                              submitLesson(LessonStatus.draft),
-                          style: OutlinedButton.styleFrom(
-                            backgroundColor: Colors.grey.shade200,
-                            foregroundColor: Colors.grey.shade700,
-                            side: BorderSide(color: Colors.grey.shade400),
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 10, vertical: 10),
-                          ),
-                          child: Text(
-                            lang.t('teacherClassDetails.saveAsDraft'),
-                            style: const TextStyle(fontSize: 12),
-                          ),
-                        ),
-                        FilledButton(
-                          onPressed: () =>
-                              submitLesson(LessonStatus.published),
-                          style: FilledButton.styleFrom(
-                            backgroundColor: labelColor,
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 12, vertical: 10),
-                          ),
-                          child: Text(
-                            lang.t('teacherClassDetails.createLesson'),
-                            style: const TextStyle(fontSize: 13),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            );
-          },
-        );
-      },
-    );
-  }
-
-  void _showCreateAssignmentDialog(BuildContext context, LanguageProvider lang,
-      List<ClassEntity> myClasses) {
-    const labelColor = Color(0xFF1F3C88);
-    const borderColor = Color(0xFFD1D5DB);
-
-    String title = '';
-    String description = '';
-    String dueDate = '';
-    String dueTime = '';
-    String points = '100';
-    String? attachedFileName;
-    String selectedClassId = myClasses.isNotEmpty ? myClasses.first.id : '';
-
-    Widget dialogLabel(String text, {bool required = false}) => Padding(
-          padding: const EdgeInsets.only(bottom: 4),
-          child: Text.rich(
-            TextSpan(
-              style: const TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: labelColor),
-              children: [
-                TextSpan(text: text),
-                if (required)
-                  const TextSpan(
-                      text: ' *',
-                      style: TextStyle(
-                          color: Colors.red, fontWeight: FontWeight.w600)),
-              ],
-            ),
-          ),
-        );
-
-    InputDecoration inputDecoration(String hint,
-            {Widget? prefixIcon, Widget? suffixIcon}) =>
-        InputDecoration(
-          hintText: hint,
-          hintStyle: TextStyle(color: Colors.grey.shade500, fontSize: 14),
-          border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: const BorderSide(color: borderColor)),
-          enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: const BorderSide(color: borderColor)),
-          contentPadding:
-              const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-          prefixIcon: prefixIcon,
-          suffixIcon: suffixIcon,
-        );
-
-    void submit() {
-      final pts = int.tryParse(points) ?? 100;
-      if (selectedClassId.isEmpty || title.isEmpty) return;
-      // dueTime kept for UI; could be added to entity later
-      final _ = dueTime;
-      final dateStr = dueDate.isEmpty
-          ? DateTime.now().toIso8601String().split('T').first
-          : dueDate;
-      final assignment = AssignmentEntity(
-        id: 'assign-${DateTime.now().millisecondsSinceEpoch}',
-        classId: selectedClassId,
-        title: title,
-        description: description,
-        dueDate: dateStr,
-        points: pts,
-        status: AssignmentStatus.pending,
+  void _showPickClassForQuickAction(
+    BuildContext context,
+    LanguageProvider lang,
+    List<ClassEntity> myClasses, {
+    required bool forLesson,
+  }) {
+    if (myClasses.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(lang.t('classes.noClassesFound'))),
       );
-      context.read<AssignmentsRepository>().addAssignment(assignment);
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-            content: Text(lang.t('actions.createAssignment'))));
-        Navigator.pop(context);
-      }
+      return;
     }
-
-    showDialog(
+    showDialog<void>(
       context: context,
-      builder: (ctx) {
-        final screenWidth = MediaQuery.sizeOf(ctx).width;
-        final dialogWidth = (screenWidth > 420) ? 400.0 : (screenWidth - 24);
-        return StatefulBuilder(
-          builder: (ctx, setDialogState) {
-            return Dialog(
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12)),
-              child: Container(
-                width: dialogWidth,
-                constraints: BoxConstraints(
-                  maxWidth: dialogWidth,
-                  maxHeight: MediaQuery.of(ctx).size.height * 0.85,
-                ),
-                padding: const EdgeInsets.fromLTRB(16, 16, 16, 20),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            lang.t('teacherClassDetails.createAssignment'),
-                            style: const TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                                color: labelColor),
-                          ),
-                        ),
-                        IconButton(
-                          onPressed: () => Navigator.pop(ctx),
-                          icon: const Icon(Icons.close,
-                              color: labelColor, size: 24),
-                          padding: EdgeInsets.zero,
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                    Flexible(
-                      child: SingleChildScrollView(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            if (myClasses.isNotEmpty) ...[
-                              dialogLabel(lang.t('classes.classDetails'),
-                                  required: true),
-                              DropdownButtonFormField<String>(
-                                value: selectedClassId.isEmpty
-                                    ? null
-                                    : selectedClassId,
-                                decoration: inputDecoration(
-                                        lang.t('students.selectClass'))
-                                    .copyWith(
-                                        contentPadding:
-                                            const EdgeInsets.symmetric(
-                                                horizontal: 12, vertical: 10)),
-                                isExpanded: true,
-                                items: myClasses
-                                    .map((c) => DropdownMenuItem(
-                                        value: c.id, child: Text(c.name)))
-                                    .toList(),
-                                onChanged: (v) => setDialogState(
-                                    () => selectedClassId = v ?? ''),
-                              ),
-                              const SizedBox(height: 12),
-                            ],
-                            dialogLabel(
-                                lang.t('teacherClassDetails.assignmentTitle'),
-                                required: true),
-                            TextField(
-                              decoration: inputDecoration(
-                                  'e.g., Chapter 5 Homework'),
-                              onChanged: (v) => title = v,
-                            ),
-                            const SizedBox(height: 12),
-                            dialogLabel(lang.t('lessons.description')),
-                            TextField(
-                              decoration: inputDecoration(
-                                  'Describe the assignment...'),
-                              maxLines: 3,
-                              onChanged: (v) => description = v,
-                            ),
-                            const SizedBox(height: 12),
-                            dialogLabel(lang.t('assignments.dueDate'),
-                                required: true),
-                            TextField(
-                              decoration: inputDecoration('dd / mm / yyyy',
-                                  prefixIcon: Icon(Icons.calendar_today,
-                                      size: 20,
-                                      color: Colors.grey.shade600)),
-                              onChanged: (v) => dueDate = v,
-                            ),
-                            const SizedBox(height: 12),
-                            dialogLabel(
-                                lang.t('teacherClassDetails.dueTime'),
-                                required: true),
-                            TextField(
-                              decoration: inputDecoration('--:-- --',
-                                  suffixIcon: Icon(Icons.schedule,
-                                      size: 20,
-                                      color: Colors.grey.shade600)),
-                              onChanged: (v) => dueTime = v,
-                            ),
-                            const SizedBox(height: 12),
-                            dialogLabel(lang.t('assignments.points'),
-                                required: true),
-                            TextField(
-                              decoration: inputDecoration('100'),
-                              keyboardType: TextInputType.number,
-                              onChanged: (v) => points = v,
-                              controller: TextEditingController(text: points),
-                            ),
-                            const SizedBox(height: 12),
-                            dialogLabel(
-                                lang.t('teacherClassDetails.attachFiles')),
-                            GestureDetector(
-                              onTap: () {},
-                              child: Container(
-                                width: double.infinity,
-                                padding:
-                                    const EdgeInsets.symmetric(vertical: 24),
-                                decoration: BoxDecoration(
-                                  border: Border.all(
-                                      color: borderColor, width: 2),
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: Column(
-                                  children: [
-                                    Icon(Icons.upload_file,
-                                        size: 36, color: labelColor),
-                                    const SizedBox(height: 8),
-                                    Text(
-                                      attachedFileName ??
-                                          'Click to upload assignment files',
-                                      style: TextStyle(
-                                        fontSize: 13,
-                                        color: (attachedFileName ?? '')
-                                                .isEmpty
-                                            ? Colors.grey.shade600
-                                            : labelColor,
-                                      ),
-                                      textAlign: TextAlign.center,
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                    Wrap(
-                      alignment: WrapAlignment.end,
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: [
-                        OutlinedButton(
-                          onPressed: () => Navigator.pop(ctx),
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: Colors.grey.shade700,
-                            backgroundColor: Colors.grey.shade100,
-                            side: BorderSide(color: borderColor),
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 14, vertical: 10),
-                          ),
-                          child: Text(
-                            lang.t('common.cancel'),
-                            style: const TextStyle(fontSize: 13),
-                          ),
-                        ),
-                        FilledButton(
-                          onPressed: submit,
-                          style: FilledButton.styleFrom(
-                            backgroundColor: AppTheme.accent,
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 14, vertical: 10),
-                          ),
-                          child: Text(
-                            lang.t('teacherClassDetails.createAssignment'),
-                            style: const TextStyle(fontSize: 13),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            );
-          },
-        );
-      },
+      builder: (dialogCtx) => AlertDialog(
+        title: Text(lang.t('students.selectClass')),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: ListView.builder(
+            shrinkWrap: true,
+            itemCount: myClasses.length,
+            itemBuilder: (_, i) {
+              final c = myClasses[i];
+              final subtitle = '${c.subject} · ${c.level}';
+              final titleText = c.name.trim().isNotEmpty ? c.name : subtitle;
+              return ListTile(
+                title: Text(titleText),
+                subtitle: c.name.trim().isNotEmpty ? Text(subtitle) : null,
+                onTap: () async {
+                  Navigator.pop(dialogCtx);
+                  final repo = context.read<TeacherClassesRepository>();
+                  final full = await repo.getClassById(c.id);
+                  if (!context.mounted) return;
+                  if (full == null) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text(lang.t('classes.classNotFound'))),
+                    );
+                    return;
+                  }
+                  if (forLesson) {
+                    showTeacherCreateLessonDialog(context, lang, full, null);
+                  } else {
+                    showTeacherCreateAssignmentDialog(context, lang, full);
+                  }
+                },
+              );
+            },
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogCtx),
+            child: Text(lang.t('common.cancel')),
+          ),
+        ],
+      ),
     );
   }
 

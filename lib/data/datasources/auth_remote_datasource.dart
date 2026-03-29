@@ -17,7 +17,7 @@ class AuthRemoteDatasource {
 
   final String _baseUrl;
 
-  String get _apiBase => _baseUrl.endsWith('/') ? '${_baseUrl}api/v1' : '${_baseUrl}/api/v1';
+  String get _apiBase => _baseUrl.endsWith('/') ? '${_baseUrl}api/v1' : '$_baseUrl/api/v1';
 
   bool get isConfigured => _baseUrl.isNotEmpty;
 
@@ -116,6 +116,32 @@ class AuthRemoteDatasource {
       body: jsonEncode(body),
     );
     return _parseAuthResponse(response);
+  }
+
+  /// GET /users/me (Auth). Returns raw `data` user map or null.
+  Future<Map<String, dynamic>?> getUsersMe(String token) async {
+    if (!isConfigured) return null;
+    final uri = Uri.parse('$_apiBase/users/me');
+    try {
+      final response = await http.get(
+        uri,
+        headers: {
+          'Accept': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
+      if (response.statusCode != 200) return null;
+      final decoded = jsonDecode(response.body) as Map<String, dynamic>?;
+      if (decoded == null) return null;
+      final success = decoded['success'];
+      if (success != true) return null;
+      final data = decoded['data'];
+      if (data is Map<String, dynamic>) return data;
+      if (data is Map) return Map<String, dynamic>.from(data);
+      return null;
+    } catch (_) {
+      return null;
+    }
   }
 
   AuthApiResponse _parseAuthResponse(http.Response response) {
