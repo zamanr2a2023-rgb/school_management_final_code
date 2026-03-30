@@ -74,7 +74,21 @@ class AppRouter {
             !isAuthenticated &&
             !isLogin &&
             !isRegister &&
-            !loc.startsWith('/sitemap')) return '/login';
+            !loc.startsWith('/sitemap') &&
+            !loc.startsWith('/otp/')) return '/login';
+        // Logged in but phone not verified (e.g. closed app before OTP) — force OTP, not home/login bypass.
+        if (isAuthenticated &&
+            user != null &&
+            !user.phoneVerified &&
+            !loc.startsWith('/otp/') &&
+            !isLanguage) {
+          final p = user.phone;
+          if (p == null || p.isEmpty) {
+            await context.read<AuthProvider>().logout();
+            return '/login';
+          }
+          return '/otp/send?phone=${Uri.encodeComponent(p)}';
+        }
         if (isAuthenticated && (isLogin || isRegister || isLanguage)) {
           if (user?.role == UserRole.student) return '/student/dashboard';
           if (user?.role == UserRole.teacher) return '/teacher/dashboard';
@@ -97,14 +111,18 @@ class AppRouter {
         GoRoute(
           path: '/otp/send',
           builder: (_, state) {
-            final phone = state.extra is String ? state.extra as String : '';
+            final fromExtra = state.extra is String ? state.extra as String : '';
+            final fromQuery = state.uri.queryParameters['phone'] ?? '';
+            final phone = fromExtra.isNotEmpty ? fromExtra : fromQuery;
             return OtpSendScreen(phone: phone);
           },
         ),
         GoRoute(
           path: '/otp/verify',
           builder: (_, state) {
-            final phone = state.extra is String ? state.extra as String : '';
+            final fromExtra = state.extra is String ? state.extra as String : '';
+            final fromQuery = state.uri.queryParameters['phone'] ?? '';
+            final phone = fromExtra.isNotEmpty ? fromExtra : fromQuery;
             return OtpVerifyScreen(phone: phone);
           },
         ),

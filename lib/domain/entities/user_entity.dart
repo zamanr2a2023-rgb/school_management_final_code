@@ -9,6 +9,10 @@ class UserEntity {
   final String? grade;
   final String? subject;
   final List<String>? enrolledClassIds;
+  /// Raw phone from API (for OTP redirect). Optional for legacy/mock users.
+  final String? phone;
+  /// From API `phoneVerified`. When false, session must not open the app home until verified.
+  final bool phoneVerified;
 
   const UserEntity({
     required this.id,
@@ -19,5 +23,7 @@ class UserEntity {
     this.grade,
     this.subject,
     this.enrolledClassIds,
+    this.phone,
+    this.phoneVerified = true,
   });
 }

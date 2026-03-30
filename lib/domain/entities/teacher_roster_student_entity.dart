@@ -106,11 +106,15 @@ class TeacherStudentsListResult {
     required this.students,
     required this.total,
     required this.distinctClassCount,
+    this.teacherAverageScorePercent,
   });
 
   final List<TeacherRosterStudentEntity> students;
   final int total;
   final int distinctClassCount;
+
+  /// From API `teacherOverview.averageStudentsScorePercentage` when present.
+  final double? teacherAverageScorePercent;
 
   double get averageGradePercent {
     if (students.isEmpty) return 0;

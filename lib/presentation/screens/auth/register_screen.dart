@@ -37,7 +37,6 @@ class _RegisterBodyState extends State<_RegisterBody> {
   static const List<String> _teacherGradeOptions = ['4th', '5th', '6th', '7th'];
   Future<List<SubjectEntity>>? _subjectsFuture;
   String? _error;
-  bool _success = false;
   bool _loading = false;
 
   @override
@@ -195,14 +194,9 @@ class _RegisterBodyState extends State<_RegisterBody> {
       assignedGrades: _role == 'teacher' && _selectedTeacherGrades.isNotEmpty ? _selectedTeacherGrades : null,
     );
     if (!mounted) return;
-    setState(() {
-      _loading = false;
-      _success = ok;
-    });
-    if (ok && _role == 'student') {
+    setState(() => _loading = false);
+    if (ok && (_role == 'student' || _role == 'teacher')) {
       context.go('/otp/send', extra: _phoneController.text.trim());
-    } else if (ok && _role == 'teacher') {
-      // Teacher pending - stay on success message
     } else if (!ok) {
       setState(() => _error = auth.lastAuthError ?? 'Phone number already registered');
     }
@@ -211,31 +205,6 @@ class _RegisterBodyState extends State<_RegisterBody> {
   @override
   Widget build(BuildContext context) {
     final lang = context.watch<LanguageProvider>();
-
-    if (_success && _role == 'teacher') {
-      return Scaffold(
-        body: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Icon(Icons.check_circle, size: 64, color: Colors.green),
-                const SizedBox(height: 16),
-                Text(lang.t('auth.registrationSuccessful'), style: Theme.of(context).textTheme.titleLarge, textAlign: TextAlign.center),
-                const SizedBox(height: 8),
-                Text(lang.t('auth.teacherAccountPending'), textAlign: TextAlign.center),
-                const SizedBox(height: 24),
-                ElevatedButton(
-                  onPressed: () => context.go('/login'),
-                  child: Text(lang.t('auth.goToLogin')),
-                ),
-              ],
-            ),
-          ),
-        ),
-      );
-    }
 
     return Scaffold(
       body: SafeArea(

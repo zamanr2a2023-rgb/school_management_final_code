@@ -25,6 +25,19 @@ class TeacherStudentsRepositoryImpl implements TeacherStudentsRepository {
     return _fallbackList(searchQuery);
   }
 
+  @override
+  Future<TeacherRosterStudentEntity?> getStudentDetail(String studentId) async {
+    if (_remote.isConfigured) {
+      final r = await _remote.fetchStudentById(studentId);
+      if (r != null) return r;
+    }
+    final list = await _fallbackList('');
+    for (final s in list.students) {
+      if (s.id == studentId) return s;
+    }
+    return null;
+  }
+
   Future<TeacherStudentsListResult> _fallbackList(String searchQuery) async {
     final allStudents = await _studentsRepo.getStudents();
     final allClasses = await _classesRepo.getClasses();
@@ -46,6 +59,7 @@ class TeacherStudentsRepositoryImpl implements TeacherStudentsRepository {
       students: roster,
       total: roster.length,
       distinctClassCount: classIds.isEmpty ? allClasses.length : classIds.length,
+      teacherAverageScorePercent: null,
     );
   }
 

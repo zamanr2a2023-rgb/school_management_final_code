@@ -750,7 +750,7 @@ class _TeacherClassDetailsScreenState extends State<TeacherClassDetailsScreen> {
               children: [
                 Expanded(
                   child: OutlinedButton(
-                    onPressed: () => context.go('/teacher/assignments/${a.id}'),
+                    onPressed: () => context.push('/teacher/assignments/${a.id}'),
                     style: OutlinedButton.styleFrom(
                       foregroundColor: AppTheme.primary,
                       backgroundColor: Colors.grey.shade100,

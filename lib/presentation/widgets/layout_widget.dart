@@ -42,12 +42,16 @@ class LayoutWidget extends StatelessWidget {
     void onBackPressed() {
       if (context.canPop()) {
         context.pop();
-      } else {
-        final segments = location.split('/').where((s) => s.isNotEmpty).toList();
-        if (segments.length > 2) {
-          final parentPath = '/${segments.sublist(0, segments.length - 1).join('/')}';
-          context.go(parentPath);
+        return;
+      }
+      final segments = location.split('/').where((s) => s.isNotEmpty).toList();
+      if (segments.length > 2) {
+        var parentPath = '/${segments.sublist(0, segments.length - 1).join('/')}';
+        // No index route for /teacher/assignments (only /teacher/assignments/:id).
+        if (parentPath == '/teacher/assignments') {
+          parentPath = '/teacher/classes';
         }
+        context.go(parentPath);
       }
     }
 

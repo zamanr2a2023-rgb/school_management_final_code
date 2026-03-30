@@ -55,7 +55,7 @@ void main() async {
   final AuthRepository authRepo = AuthRepositoryImpl(prefs);
   final ClassesRepository classesRepo = ClassesRepositoryImpl(prefs);
   final LessonsRepository lessonsRepo = LessonsRepositoryImpl();
-  final AssignmentsRepository assignmentsRepo = AssignmentsRepositoryImpl();
+  final AssignmentsRepository assignmentsRepo = AssignmentsRepositoryImpl(prefs);
   final StudentsRepository studentsRepo = StudentsRepositoryImpl();
   final TimetableRepository timetableRepo = TimetableRepositoryImpl(prefs);
   final LiveSessionsRepository liveSessionsRepo =
