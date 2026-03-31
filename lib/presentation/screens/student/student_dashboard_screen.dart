@@ -122,8 +122,9 @@ class StudentDashboardScreen extends StatelessWidget {
     final dashboard = await dashboardRepo.getDashboard();
     if (dashboard != null) return _DashboardData.fromApi(dashboard);
 
-    if (userId != null)
+    if (userId != null) {
       await subscriptionRepo.getSubscriptionForStudent(userId);
+    }
     final results = await Future.wait([
       classesRepo.getClasses(),
       assignmentsRepo.getAssignments(),

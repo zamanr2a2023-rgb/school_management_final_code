@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
-import 'package:high_school/domain/entities/assignment_entity.dart';
 import 'package:high_school/domain/repositories/assignments_repository.dart';
 import 'package:high_school/presentation/providers/language_provider.dart';
 

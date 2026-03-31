@@ -6,7 +6,6 @@ import '../../domain/entities/notification_entity.dart';
 import '../../domain/entities/student_entity.dart';
 import '../../domain/entities/subscription_entity.dart';
 import '../../domain/entities/timetable_entity.dart';
-import '../../domain/entities/user_entity.dart';
 
 class MockData {
   static final List<ClassEntity> classes = [

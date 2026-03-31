@@ -12,32 +12,43 @@ import 'package:high_school/domain/repositories/live_sessions_repository.dart';
 import 'package:high_school/domain/repositories/teacher_classes_repository.dart';
 import 'package:high_school/domain/repositories/teacher_dashboard_repository.dart';
 import 'package:high_school/presentation/screens/teacher/teacher_lesson_assignment_dialogs.dart';
+import 'package:high_school/presentation/screens/teacher/teacher_live_session_create_dialog.dart';
 import 'package:high_school/data/datasources/mock_data.dart';
 import 'package:high_school/presentation/providers/auth_provider.dart';
 import 'package:high_school/presentation/providers/language_provider.dart';
 
+enum _TeacherQuickCreateKind { lesson, assignment, liveSession }
+
 class TeacherDashboardScreen extends StatelessWidget {
   const TeacherDashboardScreen({super.key});
 
-  static const List<String> _weekdays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
+  static const List<String> _weekdays = [
+    'Monday',
+    'Tuesday',
+    'Wednesday',
+    'Thursday',
+    'Friday'
+  ];
 
   @override
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
     final lang = context.watch<LanguageProvider>();
-    final teacherId =
-        auth.user?.id == 'demo_teacher' ? 'teacher1' : (auth.user?.id ?? 'teacher1');
+    final teacherId = auth.user?.id == 'demo_teacher'
+        ? 'teacher1'
+        : (auth.user?.id ?? 'teacher1');
     final now = DateTime.now();
     final bool isWeekday =
         now.weekday >= DateTime.monday && now.weekday <= DateTime.friday;
-    final String today = isWeekday
-        ? _weekdays[now.weekday - DateTime.monday]
-        : '';
+    final String today =
+        isWeekday ? _weekdays[now.weekday - DateTime.monday] : '';
 
     return FutureBuilder<_TeacherDashboardData>(
       future: _loadDashboard(context, teacherId, today),
       builder: (context, snapshot) {
-        if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
+        if (!snapshot.hasData) {
+          return const Center(child: CircularProgressIndicator());
+        }
         final data = snapshot.data!;
         final firstName = auth.user?.name.split(' ').first ?? '';
 
@@ -50,25 +61,42 @@ class TeacherDashboardScreen extends StatelessWidget {
               children: [
                 _buildWelcomeBanner(lang, firstName),
                 const SizedBox(height: 16),
-                _buildStatsGrid(context, lang, data.cardsMyClasses, data.cardsTotalStudents, data.cardsPendingGrading, data.cardsGraded),
+                _buildStatsGrid(
+                    context,
+                    lang,
+                    data.cardsMyClasses,
+                    data.cardsTotalStudents,
+                    data.cardsPendingGrading,
+                    data.cardsGraded),
                 const SizedBox(height: 16),
                 _buildQuickActions(context, lang, data.classesForActions),
                 const SizedBox(height: 16),
                 data.isFromApi
-                    ? _buildTodaysClassesFromApi(context, lang, data.todaysClassesApi!, today)
-                    : _buildTodaysClasses(context, lang, data.todaysClassesFallback!, data.classesForActions, today),
+                    ? _buildTodaysClassesFromApi(
+                        context, lang, data.todaysClassesApi!, today)
+                    : _buildTodaysClasses(
+                        context,
+                        lang,
+                        data.todaysClassesFallback!,
+                        data.classesForActions,
+                        today),
                 const SizedBox(height: 16),
                 data.isFromApi
-                    ? _buildUpcomingSessionsFromApi(context, lang, data.upcomingSessionsApi!)
-                    : _buildUpcomingSessions(context, lang, data.upcomingSessionsFallback!),
+                    ? _buildUpcomingSessionsFromApi(
+                        context, lang, data.upcomingSessionsApi!)
+                    : _buildUpcomingSessions(
+                        context, lang, data.upcomingSessionsFallback!),
                 const SizedBox(height: 16),
                 data.isFromApi
-                    ? _buildRecentSubmissionsFromApi(context, lang, data.recentSubmissionsApi!)
+                    ? _buildRecentSubmissionsFromApi(
+                        context, lang, data.recentSubmissionsApi!)
                     : _buildRecentSubmissions(context, lang),
                 const SizedBox(height: 16),
                 data.isFromApi
-                    ? _buildMyClassesCardFromApi(context, lang, data.myClassesPreviewApi!)
-                    : _buildMyClassesCard(context, lang, data.classesForActions),
+                    ? _buildMyClassesCardFromApi(
+                        context, lang, data.myClassesPreviewApi!)
+                    : _buildMyClassesCard(
+                        context, lang, data.classesForActions),
                 const SizedBox(height: 24),
               ],
             ),
@@ -78,7 +106,8 @@ class TeacherDashboardScreen extends StatelessWidget {
     );
   }
 
-  Future<_TeacherDashboardData> _loadDashboard(BuildContext context, String teacherId, String today) async {
+  Future<_TeacherDashboardData> _loadDashboard(
+      BuildContext context, String teacherId, String today) async {
     final dashboardRepo = context.read<TeacherDashboardRepository>();
     final api = await dashboardRepo.getDashboard();
     if (api != null) {
@@ -113,11 +142,17 @@ class TeacherDashboardScreen extends StatelessWidget {
     final twoDaysLater = now.add(const Duration(days: 2));
     final upcomingSessions = allSessions.where((s) {
       final d = DateTime.tryParse(s.date);
-      return d != null && !d.isBefore(DateTime(now.year, now.month, now.day)) &&
-          (d.isBefore(DateTime(twoDaysLater.year, twoDaysLater.month, twoDaysLater.day)) || d.isAtSameMomentAs(DateTime(twoDaysLater.year, twoDaysLater.month, twoDaysLater.day)));
+      return d != null &&
+          !d.isBefore(DateTime(now.year, now.month, now.day)) &&
+          (d.isBefore(DateTime(
+                  twoDaysLater.year, twoDaysLater.month, twoDaysLater.day)) ||
+              d.isAtSameMomentAs(DateTime(
+                  twoDaysLater.year, twoDaysLater.month, twoDaysLater.day)));
     }).toList();
-    final pendingGrading = MockData.submissions.where((s) => s.grade == null).length;
-    final gradedCount = MockData.submissions.where((s) => s.grade != null).length;
+    final pendingGrading =
+        MockData.submissions.where((s) => s.grade == null).length;
+    final gradedCount =
+        MockData.submissions.where((s) => s.grade != null).length;
     return _TeacherDashboardData.fromFallback(
       myClasses: myClasses,
       todayClasses: todayClasses,
@@ -138,26 +173,65 @@ class TeacherDashboardScreen extends StatelessWidget {
           end: Alignment.bottomRight,
         ),
         borderRadius: BorderRadius.circular(12),
-        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.1), blurRadius: 8, offset: const Offset(0, 2))],
+        boxShadow: [
+          BoxShadow(
+              color: Colors.black.withValues(alpha: 0.1),
+              blurRadius: 8,
+              offset: const Offset(0, 2))
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('${lang.t('dashboard.welcomeBack')}, $firstName!', style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold, decoration: TextDecoration.none)),
+          Text('${lang.t('dashboard.welcomeBack')}, $firstName!',
+              style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  decoration: TextDecoration.none)),
           const SizedBox(height: 4),
-          Text(lang.t('dashboard.teachingOverview'), style: TextStyle(color: Colors.white.withValues(alpha: 0.9), fontSize: 14, decoration: TextDecoration.none)),
+          Text(lang.t('dashboard.teachingOverview'),
+              style: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.9),
+                  fontSize: 14,
+                  decoration: TextDecoration.none)),
         ],
       ),
     );
   }
 
-  Widget _buildStatsGrid(BuildContext context, LanguageProvider lang,
-      int classesCount, int totalStudents, int pendingGrading, int gradedCount) {
+  Widget _buildStatsGrid(
+      BuildContext context,
+      LanguageProvider lang,
+      int classesCount,
+      int totalStudents,
+      int pendingGrading,
+      int gradedCount) {
     final stats = [
-      (lang.t('classes.myClasses'), '$classesCount', Icons.menu_book, AppTheme.primary),
-      (lang.t('classes.totalStudents'), '$totalStudents', Icons.people, AppTheme.secondary),
-      (lang.t('assignments.pendingGrading'), '$pendingGrading', Icons.schedule, Colors.amber.shade700),
-      (lang.t('assignments.graded'), '$gradedCount', Icons.check_circle, AppTheme.accent),
+      (
+        lang.t('classes.myClasses'),
+        '$classesCount',
+        Icons.menu_book,
+        AppTheme.primary
+      ),
+      (
+        lang.t('classes.totalStudents'),
+        '$totalStudents',
+        Icons.people,
+        AppTheme.secondary
+      ),
+      (
+        lang.t('assignments.pendingGrading'),
+        '$pendingGrading',
+        Icons.schedule,
+        Colors.amber.shade700
+      ),
+      (
+        lang.t('assignments.graded'),
+        '$gradedCount',
+        Icons.check_circle,
+        AppTheme.accent
+      ),
     ];
     return GridView.count(
       crossAxisCount: 2,
@@ -166,23 +240,36 @@ class TeacherDashboardScreen extends StatelessWidget {
       mainAxisSpacing: 12,
       crossAxisSpacing: 12,
       childAspectRatio: 1.0,
-      children: stats.map((s) => _StatCard(title: s.$1, value: s.$2, icon: s.$3, color: s.$4)).toList(),
+      children: stats
+          .map((s) =>
+              _StatCard(title: s.$1, value: s.$2, icon: s.$3, color: s.$4))
+          .toList(),
     );
   }
 
-  Widget _buildQuickActions(
-      BuildContext context, LanguageProvider lang, List<ClassEntity> myClasses) {
+  Widget _buildQuickActions(BuildContext context, LanguageProvider lang,
+      List<ClassEntity> myClasses) {
     return Card(
       elevation: 1,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: BorderSide(color: AppTheme.primary.withValues(alpha: 0.2), width: 2)),
+      shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: BorderSide(
+              color: AppTheme.primary.withValues(alpha: 0.2), width: 2)),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Container(
             width: double.infinity,
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            decoration: BoxDecoration(color: AppTheme.primary.withValues(alpha: 0.06), borderRadius: const BorderRadius.vertical(top: Radius.circular(10))),
-            child: Text(lang.t('actions.quickActions'), style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600)),
+            decoration: BoxDecoration(
+                color: AppTheme.primary.withValues(alpha: 0.06),
+                borderRadius:
+                    const BorderRadius.vertical(top: Radius.circular(10))),
+            child: Text(lang.t('actions.quickActions'),
+                style: Theme.of(context)
+                    .textTheme
+                    .titleMedium
+                    ?.copyWith(fontWeight: FontWeight.w600)),
           ),
           Padding(
             padding: const EdgeInsets.all(16),
@@ -192,7 +279,8 @@ class TeacherDashboardScreen extends StatelessWidget {
                   width: double.infinity,
                   child: ElevatedButton.icon(
                     onPressed: () => _showPickClassForQuickAction(
-                        context, lang, myClasses, forLesson: true),
+                        context, lang, myClasses,
+                        kind: _TeacherQuickCreateKind.lesson),
                     icon: const Icon(Icons.add, size: 18),
                     label: Text(lang.t('actions.createLesson')),
                     style: ElevatedButton.styleFrom(
@@ -206,21 +294,29 @@ class TeacherDashboardScreen extends StatelessWidget {
                   width: double.infinity,
                   child: ElevatedButton.icon(
                     onPressed: () => _showPickClassForQuickAction(
-                        context, lang, myClasses, forLesson: false),
+                        context, lang, myClasses,
+                        kind: _TeacherQuickCreateKind.assignment),
                     icon: const Icon(Icons.assignment, size: 18),
                     label: Text(lang.t('actions.createAssignment')),
-                    style: ElevatedButton.styleFrom(backgroundColor: AppTheme.accent, foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(vertical: 12)),
+                    style: ElevatedButton.styleFrom(
+                        backgroundColor: AppTheme.accent,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 12)),
                   ),
                 ),
                 const SizedBox(height: 10),
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton.icon(
-                    onPressed: () =>
-                        _showScheduleLiveSessionDialog(context, lang, myClasses),
+                    onPressed: () => _showPickClassForQuickAction(
+                        context, lang, myClasses,
+                        kind: _TeacherQuickCreateKind.liveSession),
                     icon: const Icon(Icons.calendar_today, size: 18),
                     label: Text(lang.t('actions.scheduleSession')),
-                    style: ElevatedButton.styleFrom(backgroundColor: AppTheme.primary, foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(vertical: 12)),
+                    style: ElevatedButton.styleFrom(
+                        backgroundColor: AppTheme.primary,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 12)),
                   ),
                 ),
               ],
@@ -231,16 +327,27 @@ class TeacherDashboardScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildTodaysClasses(BuildContext context, LanguageProvider lang, List<TimetableEntryEntity> todayClasses, List<ClassEntity> myClasses, String today) {
+  Widget _buildTodaysClasses(
+      BuildContext context,
+      LanguageProvider lang,
+      List<TimetableEntryEntity> todayClasses,
+      List<ClassEntity> myClasses,
+      String today) {
     return Card(
       elevation: 1,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: BorderSide(color: AppTheme.primary.withValues(alpha: 0.2), width: 2)),
+      shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: BorderSide(
+              color: AppTheme.primary.withValues(alpha: 0.2), width: 2)),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            decoration: BoxDecoration(color: AppTheme.primary.withValues(alpha: 0.06), borderRadius: const BorderRadius.vertical(top: Radius.circular(10))),
+            decoration: BoxDecoration(
+                color: AppTheme.primary.withValues(alpha: 0.06),
+                borderRadius:
+                    const BorderRadius.vertical(top: Radius.circular(10))),
             child: Row(
               children: [
                 Icon(Icons.calendar_today, size: 20, color: AppTheme.primary),
@@ -262,23 +369,32 @@ class TeacherDashboardScreen extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.all(16),
             child: todayClasses.isEmpty
-                ? Padding(padding: const EdgeInsets.symmetric(vertical: 24), child: Center(child: Text(lang.t('today.noClasses'), style: TextStyle(fontSize: 12, color: Colors.grey.shade600))))
+                ? Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 24),
+                    child: Center(
+                        child: Text(lang.t('today.noClasses'),
+                            style: TextStyle(
+                                fontSize: 12, color: Colors.grey.shade600))))
                 : Column(
                     children: todayClasses.map((entry) {
                       ClassEntity? cls;
                       try {
-                        cls = myClasses.firstWhere((c) => c.id == entry.classId);
+                        cls =
+                            myClasses.firstWhere((c) => c.id == entry.classId);
                       } catch (_) {}
                       return Padding(
                         padding: const EdgeInsets.only(bottom: 10),
                         child: InkWell(
-                          onTap: () => context.go('/teacher/classes/${entry.classId}'),
+                          onTap: () =>
+                              context.go('/teacher/classes/${entry.classId}'),
                           borderRadius: BorderRadius.circular(10),
                           child: Container(
                             width: double.infinity,
                             padding: const EdgeInsets.all(12),
                             decoration: BoxDecoration(
-                              border: Border.all(color: AppTheme.primary.withValues(alpha: 0.2)),
+                              border: Border.all(
+                                  color:
+                                      AppTheme.primary.withValues(alpha: 0.2)),
                               borderRadius: BorderRadius.circular(10),
                             ),
                             child: Column(
@@ -286,18 +402,52 @@ class TeacherDashboardScreen extends StatelessWidget {
                               children: [
                                 Row(
                                   children: [
-                                    Expanded(child: Text(cls?.subject ?? entry.className, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600))),
+                                    Expanded(
+                                        child: Text(
+                                            cls?.subject ?? entry.className,
+                                            style: const TextStyle(
+                                                fontSize: 14,
+                                                fontWeight: FontWeight.w600))),
                                     Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                      decoration: BoxDecoration(color: AppTheme.secondary.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(6), border: Border.all(color: AppTheme.secondary.withValues(alpha: 0.3))),
-                                      child: Text(cls?.level ?? '', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w500, color: AppTheme.secondary)),
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 8, vertical: 4),
+                                      decoration: BoxDecoration(
+                                          color: AppTheme.secondary
+                                              .withValues(alpha: 0.15),
+                                          borderRadius:
+                                              BorderRadius.circular(6),
+                                          border: Border.all(
+                                              color: AppTheme.secondary
+                                                  .withValues(alpha: 0.3))),
+                                      child: Text(cls?.level ?? '',
+                                          style: TextStyle(
+                                              fontSize: 10,
+                                              fontWeight: FontWeight.w500,
+                                              color: AppTheme.secondary)),
                                     ),
                                   ],
                                 ),
                                 const SizedBox(height: 8),
-                                Row(children: [Icon(Icons.schedule, size: 14, color: Colors.grey.shade600), const SizedBox(width: 6), Text(entry.time, style: TextStyle(fontSize: 12, color: Colors.grey.shade600))]),
+                                Row(children: [
+                                  Icon(Icons.schedule,
+                                      size: 14, color: Colors.grey.shade600),
+                                  const SizedBox(width: 6),
+                                  Text(entry.time,
+                                      style: TextStyle(
+                                          fontSize: 12,
+                                          color: Colors.grey.shade600))
+                                ]),
                                 const SizedBox(height: 4),
-                                Row(children: [Icon(Icons.people, size: 14, color: Colors.grey.shade600), const SizedBox(width: 6), Text('${cls?.students ?? 0} ${lang.t('classes.students')}', style: TextStyle(fontSize: 12, color: Colors.grey.shade600))]),
+                                Row(children: [
+                                  Icon(Icons.people,
+                                      size: 14, color: Colors.grey.shade600),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                      '${cls?.students ?? 0} ${lang.t('classes.students')}',
+                                      style: TextStyle(
+                                          fontSize: 12,
+                                          color: Colors.grey.shade600))
+                                ]),
                               ],
                             ),
                           ),
@@ -311,24 +461,36 @@ class TeacherDashboardScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildTodaysClassesFromApi(BuildContext context, LanguageProvider lang, List<TeacherDashboardTodayClass> todaysClasses, String today) {
+  Widget _buildTodaysClassesFromApi(BuildContext context, LanguageProvider lang,
+      List<TeacherDashboardTodayClass> todaysClasses, String today) {
     return Card(
       elevation: 1,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: BorderSide(color: AppTheme.primary.withValues(alpha: 0.2), width: 2)),
+      shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: BorderSide(
+              color: AppTheme.primary.withValues(alpha: 0.2), width: 2)),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            decoration: BoxDecoration(color: AppTheme.primary.withValues(alpha: 0.06), borderRadius: const BorderRadius.vertical(top: Radius.circular(10))),
+            decoration: BoxDecoration(
+                color: AppTheme.primary.withValues(alpha: 0.06),
+                borderRadius:
+                    const BorderRadius.vertical(top: Radius.circular(10))),
             child: Row(
               children: [
                 Icon(Icons.calendar_today, size: 20, color: AppTheme.primary),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    today.isNotEmpty ? '${lang.t('today.todayClasses')} - $today' : lang.t('today.todayClasses'),
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+                    today.isNotEmpty
+                        ? '${lang.t('today.todayClasses')} - $today'
+                        : lang.t('today.todayClasses'),
+                    style: Theme.of(context)
+                        .textTheme
+                        .titleMedium
+                        ?.copyWith(fontWeight: FontWeight.w600),
                   ),
                 ),
               ],
@@ -337,19 +499,27 @@ class TeacherDashboardScreen extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.all(16),
             child: todaysClasses.isEmpty
-                ? Padding(padding: const EdgeInsets.symmetric(vertical: 24), child: Center(child: Text(lang.t('today.noClasses'), style: TextStyle(fontSize: 12, color: Colors.grey.shade600))))
+                ? Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 24),
+                    child: Center(
+                        child: Text(lang.t('today.noClasses'),
+                            style: TextStyle(
+                                fontSize: 12, color: Colors.grey.shade600))))
                 : Column(
                     children: todaysClasses.map((entry) {
                       return Padding(
                         padding: const EdgeInsets.only(bottom: 10),
                         child: InkWell(
-                          onTap: () => context.go('/teacher/classes/${entry.classId}'),
+                          onTap: () =>
+                              context.go('/teacher/classes/${entry.classId}'),
                           borderRadius: BorderRadius.circular(10),
                           child: Container(
                             width: double.infinity,
                             padding: const EdgeInsets.all(12),
                             decoration: BoxDecoration(
-                              border: Border.all(color: AppTheme.primary.withValues(alpha: 0.2)),
+                              border: Border.all(
+                                  color:
+                                      AppTheme.primary.withValues(alpha: 0.2)),
                               borderRadius: BorderRadius.circular(10),
                             ),
                             child: Column(
@@ -357,18 +527,54 @@ class TeacherDashboardScreen extends StatelessWidget {
                               children: [
                                 Row(
                                   children: [
-                                    Expanded(child: Text(entry.subject, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600))),
+                                    Expanded(
+                                        child: Text(entry.subject,
+                                            style: const TextStyle(
+                                                fontSize: 14,
+                                                fontWeight: FontWeight.w600))),
                                     Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                      decoration: BoxDecoration(color: AppTheme.secondary.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(6), border: Border.all(color: AppTheme.secondary.withValues(alpha: 0.3))),
-                                      child: Text(entry.gradeLevel, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w500, color: AppTheme.secondary)),
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 8, vertical: 4),
+                                      decoration: BoxDecoration(
+                                          color: AppTheme.secondary
+                                              .withValues(alpha: 0.15),
+                                          borderRadius:
+                                              BorderRadius.circular(6),
+                                          border: Border.all(
+                                              color: AppTheme.secondary
+                                                  .withValues(alpha: 0.3))),
+                                      child: Text(entry.gradeLevel,
+                                          style: TextStyle(
+                                              fontSize: 10,
+                                              fontWeight: FontWeight.w500,
+                                              color: AppTheme.secondary)),
                                     ),
                                   ],
                                 ),
                                 const SizedBox(height: 8),
-                                Row(children: [Icon(Icons.schedule, size: 14, color: Colors.grey.shade600), const SizedBox(width: 6), Text(entry.timeLabel.isNotEmpty ? entry.timeLabel : '—', style: TextStyle(fontSize: 12, color: Colors.grey.shade600))]),
+                                Row(children: [
+                                  Icon(Icons.schedule,
+                                      size: 14, color: Colors.grey.shade600),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                      entry.timeLabel.isNotEmpty
+                                          ? entry.timeLabel
+                                          : '—',
+                                      style: TextStyle(
+                                          fontSize: 12,
+                                          color: Colors.grey.shade600))
+                                ]),
                                 const SizedBox(height: 4),
-                                Row(children: [Icon(Icons.people, size: 14, color: Colors.grey.shade600), const SizedBox(width: 6), Text('${entry.studentsCount} ${lang.t('classes.students')}', style: TextStyle(fontSize: 12, color: Colors.grey.shade600))]),
+                                Row(children: [
+                                  Icon(Icons.people,
+                                      size: 14, color: Colors.grey.shade600),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                      '${entry.studentsCount} ${lang.t('classes.students')}',
+                                      style: TextStyle(
+                                          fontSize: 12,
+                                          color: Colors.grey.shade600))
+                                ]),
                               ],
                             ),
                           ),
@@ -382,28 +588,46 @@ class TeacherDashboardScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildUpcomingSessionsFromApi(BuildContext context, LanguageProvider lang, List<TeacherDashboardUpcomingSession> upcomingSessions) {
+  Widget _buildUpcomingSessionsFromApi(
+      BuildContext context,
+      LanguageProvider lang,
+      List<TeacherDashboardUpcomingSession> upcomingSessions) {
     return Card(
       elevation: 1,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: BorderSide(color: AppTheme.primary.withValues(alpha: 0.2), width: 2)),
+      shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: BorderSide(
+              color: AppTheme.primary.withValues(alpha: 0.2), width: 2)),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            decoration: BoxDecoration(color: AppTheme.primary.withValues(alpha: 0.06), borderRadius: const BorderRadius.vertical(top: Radius.circular(10))),
+            decoration: BoxDecoration(
+                color: AppTheme.primary.withValues(alpha: 0.06),
+                borderRadius:
+                    const BorderRadius.vertical(top: Radius.circular(10))),
             child: Row(
               children: [
                 Icon(Icons.video_call, size: 20, color: AppTheme.primary),
                 const SizedBox(width: 8),
-                Text(lang.t('live.upcomingSessions'), style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600)),
+                Text(lang.t('live.upcomingSessions'),
+                    style: Theme.of(context)
+                        .textTheme
+                        .titleMedium
+                        ?.copyWith(fontWeight: FontWeight.w600)),
               ],
             ),
           ),
           Padding(
             padding: const EdgeInsets.all(16),
             child: upcomingSessions.isEmpty
-                ? Padding(padding: const EdgeInsets.symmetric(vertical: 24), child: Center(child: Text('No upcoming live sessions', style: TextStyle(fontSize: 12, color: Colors.grey.shade600))))
+                ? Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 24),
+                    child: Center(
+                        child: Text('No upcoming live sessions',
+                            style: TextStyle(
+                                fontSize: 12, color: Colors.grey.shade600))))
                 : Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
@@ -411,20 +635,31 @@ class TeacherDashboardScreen extends StatelessWidget {
                             padding: const EdgeInsets.only(bottom: 8),
                             child: Container(
                               padding: const EdgeInsets.all(12),
-                              decoration: BoxDecoration(border: Border.all(color: AppTheme.primary.withValues(alpha: 0.2)), borderRadius: BorderRadius.circular(10)),
+                              decoration: BoxDecoration(
+                                  border: Border.all(
+                                      color: AppTheme.primary
+                                          .withValues(alpha: 0.2)),
+                                  borderRadius: BorderRadius.circular(10)),
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Text(s.title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+                                  Text(s.title,
+                                      style: const TextStyle(
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.w600)),
                                   const SizedBox(height: 6),
-                                  Text('${s.date ?? ''} • ${s.time ?? ''}', style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
+                                  Text('${s.date ?? ''} • ${s.time ?? ''}',
+                                      style: TextStyle(
+                                          fontSize: 12,
+                                          color: Colors.grey.shade600)),
                                 ],
                               ),
                             ),
                           )),
                       OutlinedButton(
                         onPressed: () => context.go('/teacher/live-sessions'),
-                        style: OutlinedButton.styleFrom(foregroundColor: AppTheme.primary),
+                        style: OutlinedButton.styleFrom(
+                            foregroundColor: AppTheme.primary),
                         child: Text(lang.t('common.viewAll')),
                       ),
                     ],
@@ -435,24 +670,47 @@ class TeacherDashboardScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildRecentSubmissionsFromApi(BuildContext context, LanguageProvider lang, List<TeacherDashboardRecentSubmission> recentSubmissions) {
+  Widget _buildRecentSubmissionsFromApi(
+      BuildContext context,
+      LanguageProvider lang,
+      List<TeacherDashboardRecentSubmission> recentSubmissions) {
     final pending = recentSubmissions.where((s) => !s.graded).toList();
     return Card(
       elevation: 1,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: BorderSide(color: AppTheme.primary.withValues(alpha: 0.2), width: 2)),
+      shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: BorderSide(
+              color: AppTheme.primary.withValues(alpha: 0.2), width: 2)),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            decoration: BoxDecoration(color: AppTheme.primary.withValues(alpha: 0.06), borderRadius: const BorderRadius.vertical(top: Radius.circular(10))),
+            decoration: BoxDecoration(
+                color: AppTheme.primary.withValues(alpha: 0.06),
+                borderRadius:
+                    const BorderRadius.vertical(top: Radius.circular(10))),
             child: Row(
               children: [
-                Expanded(child: Text(lang.t('recent.recentSubmissions'), style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600))),
+                Expanded(
+                    child: Text(lang.t('recent.recentSubmissions'),
+                        style: Theme.of(context)
+                            .textTheme
+                            .titleMedium
+                            ?.copyWith(fontWeight: FontWeight.w600))),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(color: AppTheme.accent.withValues(alpha: 0.2), borderRadius: BorderRadius.circular(6), border: Border.all(color: AppTheme.accent.withValues(alpha: 0.3))),
-                  child: Text('${pending.length}', style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: AppTheme.accent)),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                      color: AppTheme.accent.withValues(alpha: 0.2),
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(
+                          color: AppTheme.accent.withValues(alpha: 0.3))),
+                  child: Text('${pending.length}',
+                      style: const TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w600,
+                          color: AppTheme.accent)),
                 ),
               ],
             ),
@@ -463,25 +721,56 @@ class TeacherDashboardScreen extends StatelessWidget {
               children: [
                 ...pending.take(3).map((s) => Padding(
                       padding: const EdgeInsets.only(bottom: 8),
-                      child: Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(border: Border.all(color: AppTheme.primary.withValues(alpha: 0.2)), borderRadius: BorderRadius.circular(10)),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(s.studentName, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
-                            const SizedBox(height: 4),
-                            Text(_formatSubmittedDate(s.submittedAt ?? ''), style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
-                          ],
+                      child: Material(
+                        color: Colors.transparent,
+                        child: InkWell(
+                          onTap: () {
+                            final aid = s.assignmentId.trim();
+                            if (aid.isNotEmpty) {
+                              context.push('/teacher/assignments/$aid');
+                            }
+                          },
+                          borderRadius: BorderRadius.circular(10),
+                          child: Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                                border: Border.all(
+                                    color: AppTheme.primary.withValues(alpha: 0.2)),
+                                borderRadius: BorderRadius.circular(10)),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(s.studentName,
+                                    style: const TextStyle(
+                                        fontSize: 14, fontWeight: FontWeight.w600)),
+                                const SizedBox(height: 4),
+                                Text(_formatSubmittedDate(s.submittedAt ?? ''),
+                                    style: TextStyle(
+                                        fontSize: 12, color: Colors.grey.shade600)),
+                              ],
+                            ),
+                          ),
                         ),
                       ),
                     )),
                 SizedBox(
                   width: double.infinity,
                   child: OutlinedButton(
-                    onPressed: () => context.go('/teacher/classes'),
-                    style: OutlinedButton.styleFrom(foregroundColor: AppTheme.primary),
+                    onPressed: () {
+                      if (pending.isEmpty) {
+                        context.push('/teacher/classes');
+                        return;
+                      }
+                      final aid = pending.first.assignmentId.trim();
+                      if (aid.isEmpty) {
+                        context.push('/teacher/classes');
+                        return;
+                      }
+                      context.push('/teacher/assignments/$aid');
+                    },
+                    style: OutlinedButton.styleFrom(
+                        foregroundColor: AppTheme.primary),
                     child: Text(lang.t('actions.viewSubmissions')),
                   ),
                 ),
@@ -493,23 +782,42 @@ class TeacherDashboardScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildMyClassesCardFromApi(BuildContext context, LanguageProvider lang, List<TeacherDashboardClassPreview> myClassesPreview) {
+  Widget _buildMyClassesCardFromApi(BuildContext context, LanguageProvider lang,
+      List<TeacherDashboardClassPreview> myClassesPreview) {
     return Card(
       elevation: 1,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: BorderSide(color: AppTheme.primary.withValues(alpha: 0.2), width: 2)),
+      shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: BorderSide(
+              color: AppTheme.primary.withValues(alpha: 0.2), width: 2)),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            decoration: BoxDecoration(color: AppTheme.primary.withValues(alpha: 0.06), borderRadius: const BorderRadius.vertical(top: Radius.circular(10))),
+            decoration: BoxDecoration(
+                color: AppTheme.primary.withValues(alpha: 0.06),
+                borderRadius:
+                    const BorderRadius.vertical(top: Radius.circular(10))),
             child: Row(
               children: [
-                Expanded(child: Text(lang.t('classes.myClasses'), style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600))),
+                Expanded(
+                    child: Text(lang.t('classes.myClasses'),
+                        style: Theme.of(context)
+                            .textTheme
+                            .titleMedium
+                            ?.copyWith(fontWeight: FontWeight.w600))),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(color: AppTheme.accent.withValues(alpha: 0.2), borderRadius: BorderRadius.circular(6)),
-                  child: Text('${myClassesPreview.length}', style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: AppTheme.accent)),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                      color: AppTheme.accent.withValues(alpha: 0.2),
+                      borderRadius: BorderRadius.circular(6)),
+                  child: Text('${myClassesPreview.length}',
+                      style: const TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w600,
+                          color: AppTheme.accent)),
                 ),
               ],
             ),
@@ -526,22 +834,50 @@ class TeacherDashboardScreen extends StatelessWidget {
                         child: Container(
                           width: double.infinity,
                           padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(border: Border.all(color: AppTheme.primary.withValues(alpha: 0.2)), borderRadius: BorderRadius.circular(10)),
+                          decoration: BoxDecoration(
+                              border: Border.all(
+                                  color:
+                                      AppTheme.primary.withValues(alpha: 0.2)),
+                              borderRadius: BorderRadius.circular(10)),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Row(
                                 children: [
-                                  Expanded(child: Text(c.subject, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600))),
+                                  Expanded(
+                                      child: Text(c.subject,
+                                          style: const TextStyle(
+                                              fontSize: 14,
+                                              fontWeight: FontWeight.w600))),
                                   Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                    decoration: BoxDecoration(color: AppTheme.secondary.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(6), border: Border.all(color: AppTheme.secondary.withValues(alpha: 0.3))),
-                                    child: Text(c.gradeLevel, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w500, color: AppTheme.secondary)),
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 8, vertical: 4),
+                                    decoration: BoxDecoration(
+                                        color: AppTheme.secondary
+                                            .withValues(alpha: 0.15),
+                                        borderRadius: BorderRadius.circular(6),
+                                        border: Border.all(
+                                            color: AppTheme.secondary
+                                                .withValues(alpha: 0.3))),
+                                    child: Text(c.gradeLevel,
+                                        style: TextStyle(
+                                            fontSize: 10,
+                                            fontWeight: FontWeight.w500,
+                                            color: AppTheme.secondary)),
                                   ),
                                 ],
                               ),
                               const SizedBox(height: 8),
-                              Row(children: [Icon(Icons.people, size: 14, color: Colors.grey.shade600), const SizedBox(width: 6), Text('${c.studentsCount} ${lang.t('classes.students')}', style: TextStyle(fontSize: 12, color: Colors.grey.shade600))]),
+                              Row(children: [
+                                Icon(Icons.people,
+                                    size: 14, color: Colors.grey.shade600),
+                                const SizedBox(width: 6),
+                                Text(
+                                    '${c.studentsCount} ${lang.t('classes.students')}',
+                                    style: TextStyle(
+                                        fontSize: 12,
+                                        color: Colors.grey.shade600))
+                              ]),
                             ],
                           ),
                         ),
@@ -551,7 +887,8 @@ class TeacherDashboardScreen extends StatelessWidget {
                   width: double.infinity,
                   child: OutlinedButton(
                     onPressed: () => context.go('/teacher/classes'),
-                    style: OutlinedButton.styleFrom(foregroundColor: AppTheme.primary),
+                    style: OutlinedButton.styleFrom(
+                        foregroundColor: AppTheme.primary),
                     child: Text(lang.t('common.viewAll')),
                   ),
                 ),
@@ -567,7 +904,7 @@ class TeacherDashboardScreen extends StatelessWidget {
     BuildContext context,
     LanguageProvider lang,
     List<ClassEntity> myClasses, {
-    required bool forLesson,
+    required _TeacherQuickCreateKind kind,
   }) {
     if (myClasses.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -577,6 +914,7 @@ class TeacherDashboardScreen extends StatelessWidget {
     }
     showDialog<void>(
       context: context,
+      useRootNavigator: true,
       builder: (dialogCtx) => AlertDialog(
         title: Text(lang.t('students.selectClass')),
         content: SizedBox(
@@ -602,10 +940,16 @@ class TeacherDashboardScreen extends StatelessWidget {
                     );
                     return;
                   }
-                  if (forLesson) {
-                    showTeacherCreateLessonDialog(context, lang, full, null);
-                  } else {
-                    showTeacherCreateAssignmentDialog(context, lang, full);
+                  switch (kind) {
+                    case _TeacherQuickCreateKind.lesson:
+                      showTeacherCreateLessonDialog(context, lang, full, null);
+                      break;
+                    case _TeacherQuickCreateKind.assignment:
+                      showTeacherCreateAssignmentDialog(context, lang, full);
+                      break;
+                    case _TeacherQuickCreateKind.liveSession:
+                      showTeacherCreateLiveSessionDialog(context, lang, full);
+                      break;
                   }
                 },
               );
@@ -622,390 +966,44 @@ class TeacherDashboardScreen extends StatelessWidget {
     );
   }
 
-  void _showScheduleLiveSessionDialog(BuildContext context, LanguageProvider lang,
-      List<ClassEntity> myClasses) {
-    const labelColor = Color(0xFF1F3C88);
-    const borderColor = Color(0xFFD1D5DB);
-
-    String title = '';
-    String grade = '';
-    String subject = '';
-    String className = '';
-    String date = '';
-    String time = '';
-    String zoomLink = '';
-    String selectedClassId = myClasses.isNotEmpty ? myClasses.first.id : '';
-
-    Widget dialogLabel(String text, {bool required = false}) => Padding(
-          padding: const EdgeInsets.only(bottom: 4),
-          child: Text.rich(
-            TextSpan(
-              style: const TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: labelColor),
-              children: [
-                TextSpan(text: text),
-                if (required)
-                  const TextSpan(
-                      text: ' *',
-                      style: TextStyle(
-                          color: Colors.red, fontWeight: FontWeight.w600)),
-              ],
-            ),
-          ),
-        );
-
-    InputDecoration inputDecoration(String hint,
-            {Widget? prefixIcon, Widget? suffixIcon}) =>
-        InputDecoration(
-          hintText: hint,
-          hintStyle: TextStyle(color: Colors.grey.shade500, fontSize: 14),
-          border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: const BorderSide(color: borderColor)),
-          enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: const BorderSide(color: borderColor)),
-          contentPadding:
-              const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-          prefixIcon: prefixIcon,
-          suffixIcon: suffixIcon,
-        );
-
-    const gradeOptions = ['4th', '5th', '6th', '7th'];
-    const subjectOptions = [
-      'Mathematics',
-      'Physics',
-      'Chemistry',
-      'SVT',
-      'French',
-      'Arabic',
-      'English'
-    ];
-
-    void submit() {
-      if (title.isEmpty || selectedClassId.isEmpty || date.isEmpty ||
-          time.isEmpty || zoomLink.isEmpty) return;
-      final platform = zoomLink.toLowerCase().contains('zoom')
-          ? LiveSessionPlatform.zoom
-          : LiveSessionPlatform.meet;
-      final session = LiveSessionEntity(
-        id: 'live-${DateTime.now().millisecondsSinceEpoch}',
-        classId: selectedClassId,
-        title: title,
-        date: date,
-        time: time,
-        platform: platform,
-        link: zoomLink,
-        isActive: false,
-      );
-      context.read<LiveSessionsRepository>().addLiveSession(session);
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-            content: Text(className.isEmpty
-                ? lang.t('live.createSession')
-                : '${lang.t('live.createSession')} — $className')));
-        Navigator.pop(context);
-      }
-    }
-
-    showDialog(
-      context: context,
-      builder: (ctx) {
-        final screenWidth = MediaQuery.sizeOf(ctx).width;
-        final dialogWidth = (screenWidth > 420) ? 400.0 : (screenWidth - 24);
-        return StatefulBuilder(
-          builder: (ctx, setDialogState) {
-            return Dialog(
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12)),
-              child: Container(
-                width: dialogWidth,
-                constraints: BoxConstraints(
-                  maxWidth: dialogWidth,
-                  maxHeight: MediaQuery.of(ctx).size.height * 0.85,
-                ),
-                padding: const EdgeInsets.fromLTRB(16, 16, 16, 20),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFE3F2FD),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            lang.t('live.createLiveSession'),
-                            style: const TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                                color: labelColor),
-                          ),
-                        ),
-                        IconButton(
-                          onPressed: () => Navigator.pop(ctx),
-                          icon: const Icon(Icons.close,
-                              color: labelColor, size: 24),
-                          padding: EdgeInsets.zero,
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                    Flexible(
-                      child: SingleChildScrollView(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            dialogLabel(lang.t('live.sessionTitle'),
-                                required: true),
-                            TextField(
-                              decoration: inputDecoration(
-                                  'e.g., Mathematics Q&A Session'),
-                              onChanged: (v) => title = v,
-                            ),
-                            const SizedBox(height: 12),
-                            Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      dialogLabel(lang.t('live.grade'),
-                                          required: true),
-                                      DropdownButtonFormField<String>(
-                                        value: grade.isEmpty
-                                            ? null
-                                            : (gradeOptions.contains(grade)
-                                                ? grade
-                                                : null),
-                                        decoration: inputDecoration(
-                                                'Select grade')
-                                            .copyWith(
-                                                contentPadding:
-                                                    const EdgeInsets
-                                                        .symmetric(
-                                                        horizontal: 12,
-                                                        vertical: 10)),
-                                        isExpanded: true,
-                                        items: gradeOptions
-                                            .map((g) => DropdownMenuItem(
-                                                value: g,
-                                                child: Text('$g Grade')))
-                                            .toList(),
-                                        onChanged: (v) =>
-                                            setDialogState(() => grade = v ?? ''),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      dialogLabel(lang.t('live.subject'),
-                                          required: true),
-                                      DropdownButtonFormField<String>(
-                                        value: subject.isEmpty
-                                            ? null
-                                            : (subjectOptions.contains(subject)
-                                                ? subject
-                                                : null),
-                                        decoration: inputDecoration(
-                                                'Select subject')
-                                            .copyWith(
-                                                contentPadding:
-                                                    const EdgeInsets
-                                                        .symmetric(
-                                                        horizontal: 12,
-                                                        vertical: 10)),
-                                        isExpanded: true,
-                                        items: subjectOptions
-                                            .map((s) => DropdownMenuItem(
-                                                value: s,
-                                                child: Text(s)))
-                                            .toList(),
-                                        onChanged: (v) => setDialogState(
-                                            () => subject = v ?? ''),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 12),
-                            dialogLabel(lang.t('live.className'),
-                                required: true),
-                            if (myClasses.isNotEmpty)
-                              DropdownButtonFormField<String>(
-                                value: selectedClassId.isEmpty
-                                    ? null
-                                    : selectedClassId,
-                                decoration: inputDecoration(
-                                        'e.g., 4th Grade - Math A')
-                                    .copyWith(
-                                        contentPadding:
-                                            const EdgeInsets.symmetric(
-                                                horizontal: 12,
-                                                vertical: 10)),
-                                isExpanded: true,
-                                items: myClasses
-                                    .map((c) => DropdownMenuItem(
-                                        value: c.id,
-                                        child: Text(c.name),
-                                      ))
-                                    .toList(),
-                                onChanged: (v) => setDialogState(
-                                    () {
-                                      selectedClassId = v ?? '';
-                                      if (v != null) {
-                                        final c = myClasses
-                                            .firstWhere((x) => x.id == v);
-                                        className = c.name;
-                                      }
-                                    }),
-                              )
-                            else
-                              TextField(
-                                decoration: inputDecoration(
-                                    'e.g., 4th Grade - Math A'),
-                                onChanged: (v) {
-                                  className = v;
-                                  selectedClassId = 'class1';
-                                },
-                              ),
-                            const SizedBox(height: 12),
-                            Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      dialogLabel(lang.t('live.date'),
-                                          required: true),
-                                      TextField(
-                                        decoration: inputDecoration(
-                                                'dd / mm / yyyy')
-                                            .copyWith(
-                                                prefixIcon: Icon(
-                                                    Icons.calendar_today,
-                                                    size: 20,
-                                                    color:
-                                                        Colors.grey.shade600)),
-                                        onChanged: (v) => date = v,
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      dialogLabel(lang.t('live.time'),
-                                          required: true),
-                                      TextField(
-                                        decoration: inputDecoration('--:-- --')
-                                            .copyWith(
-                                                suffixIcon: Icon(
-                                                    Icons.schedule,
-                                                    size: 20,
-                                                    color:
-                                                        Colors.grey.shade600)),
-                                        onChanged: (v) => time = v,
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 12),
-                            dialogLabel(lang.t('live.zoomMeetingLink'),
-                                required: true),
-                            TextField(
-                              decoration: inputDecoration(
-                                  'https://zoom.us/j/...'),
-                              onChanged: (v) => zoomLink = v,
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        OutlinedButton(
-                          onPressed: () => Navigator.pop(ctx),
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: Colors.grey.shade700,
-                            backgroundColor: Colors.white,
-                            side: BorderSide(color: borderColor),
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 14, vertical: 10),
-                          ),
-                          child: Text(
-                            lang.t('common.cancel'),
-                            style: const TextStyle(fontSize: 13),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        FilledButton(
-                          onPressed: submit,
-                          style: FilledButton.styleFrom(
-                            backgroundColor: AppTheme.primary,
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 14, vertical: 10),
-                          ),
-                          child: Text(
-                            lang.t('live.createSession'),
-                            style: const TextStyle(fontSize: 13),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            );
-          },
-        );
-      },
-    );
-  }
-
-  Widget _buildUpcomingSessions(BuildContext context, LanguageProvider lang, List<LiveSessionEntity> upcomingSessions) {
+  Widget _buildUpcomingSessions(BuildContext context, LanguageProvider lang,
+      List<LiveSessionEntity> upcomingSessions) {
     return Card(
       elevation: 1,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: BorderSide(color: AppTheme.primary.withValues(alpha: 0.2), width: 2)),
+      shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: BorderSide(
+              color: AppTheme.primary.withValues(alpha: 0.2), width: 2)),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            decoration: BoxDecoration(color: AppTheme.primary.withValues(alpha: 0.06), borderRadius: const BorderRadius.vertical(top: Radius.circular(10))),
+            decoration: BoxDecoration(
+                color: AppTheme.primary.withValues(alpha: 0.06),
+                borderRadius:
+                    const BorderRadius.vertical(top: Radius.circular(10))),
             child: Row(
               children: [
                 Icon(Icons.video_call, size: 20, color: AppTheme.primary),
                 const SizedBox(width: 8),
-                Text(lang.t('live.upcomingSessions'), style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600)),
+                Text(lang.t('live.upcomingSessions'),
+                    style: Theme.of(context)
+                        .textTheme
+                        .titleMedium
+                        ?.copyWith(fontWeight: FontWeight.w600)),
               ],
             ),
           ),
           Padding(
             padding: const EdgeInsets.all(16),
             child: upcomingSessions.isEmpty
-                ? Padding(padding: const EdgeInsets.symmetric(vertical: 24), child: Center(child: Text('No upcoming live sessions', style: TextStyle(fontSize: 12, color: Colors.grey.shade600))))
+                ? Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 24),
+                    child: Center(
+                        child: Text('No upcoming live sessions',
+                            style: TextStyle(
+                                fontSize: 12, color: Colors.grey.shade600))))
                 : Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
@@ -1013,20 +1011,31 @@ class TeacherDashboardScreen extends StatelessWidget {
                             padding: const EdgeInsets.only(bottom: 8),
                             child: Container(
                               padding: const EdgeInsets.all(12),
-                              decoration: BoxDecoration(border: Border.all(color: AppTheme.primary.withValues(alpha: 0.2)), borderRadius: BorderRadius.circular(10)),
+                              decoration: BoxDecoration(
+                                  border: Border.all(
+                                      color: AppTheme.primary
+                                          .withValues(alpha: 0.2)),
+                                  borderRadius: BorderRadius.circular(10)),
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Text(s.title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+                                  Text(s.title,
+                                      style: const TextStyle(
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.w600)),
                                   const SizedBox(height: 6),
-                                  Text('${s.date} • ${s.time}', style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
+                                  Text('${s.date} • ${s.time}',
+                                      style: TextStyle(
+                                          fontSize: 12,
+                                          color: Colors.grey.shade600)),
                                 ],
                               ),
                             ),
                           )),
                       OutlinedButton(
                         onPressed: () => context.go('/teacher/live-sessions'),
-                        style: OutlinedButton.styleFrom(foregroundColor: AppTheme.primary),
+                        style: OutlinedButton.styleFrom(
+                            foregroundColor: AppTheme.primary),
                         child: Text(lang.t('common.viewAll')),
                       ),
                     ],
@@ -1041,20 +1050,40 @@ class TeacherDashboardScreen extends StatelessWidget {
     final pending = MockData.submissions.where((s) => s.grade == null).toList();
     return Card(
       elevation: 1,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: BorderSide(color: AppTheme.primary.withValues(alpha: 0.2), width: 2)),
+      shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: BorderSide(
+              color: AppTheme.primary.withValues(alpha: 0.2), width: 2)),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            decoration: BoxDecoration(color: AppTheme.primary.withValues(alpha: 0.06), borderRadius: const BorderRadius.vertical(top: Radius.circular(10))),
+            decoration: BoxDecoration(
+                color: AppTheme.primary.withValues(alpha: 0.06),
+                borderRadius:
+                    const BorderRadius.vertical(top: Radius.circular(10))),
             child: Row(
               children: [
-                Expanded(child: Text(lang.t('recent.recentSubmissions'), style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600))),
+                Expanded(
+                    child: Text(lang.t('recent.recentSubmissions'),
+                        style: Theme.of(context)
+                            .textTheme
+                            .titleMedium
+                            ?.copyWith(fontWeight: FontWeight.w600))),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(color: AppTheme.accent.withValues(alpha: 0.2), borderRadius: BorderRadius.circular(6), border: Border.all(color: AppTheme.accent.withValues(alpha: 0.3))),
-                  child: Text('${pending.length}', style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: AppTheme.accent)),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                      color: AppTheme.accent.withValues(alpha: 0.2),
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(
+                          color: AppTheme.accent.withValues(alpha: 0.3))),
+                  child: Text('${pending.length}',
+                      style: const TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w600,
+                          color: AppTheme.accent)),
                 ),
               ],
             ),
@@ -1065,25 +1094,56 @@ class TeacherDashboardScreen extends StatelessWidget {
               children: [
                 ...pending.take(3).map((s) => Padding(
                       padding: const EdgeInsets.only(bottom: 8),
-                      child: Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(border: Border.all(color: AppTheme.primary.withValues(alpha: 0.2)), borderRadius: BorderRadius.circular(10)),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(s.studentName, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
-                            const SizedBox(height: 4),
-                            Text(_formatSubmittedDate(s.submittedAt), style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
-                          ],
+                      child: Material(
+                        color: Colors.transparent,
+                        child: InkWell(
+                          onTap: () {
+                            final aid = s.assignmentId.trim();
+                            if (aid.isNotEmpty) {
+                              context.push('/teacher/assignments/$aid');
+                            }
+                          },
+                          borderRadius: BorderRadius.circular(10),
+                          child: Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                                border: Border.all(
+                                    color: AppTheme.primary.withValues(alpha: 0.2)),
+                                borderRadius: BorderRadius.circular(10)),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(s.studentName,
+                                    style: const TextStyle(
+                                        fontSize: 14, fontWeight: FontWeight.w600)),
+                                const SizedBox(height: 4),
+                                Text(_formatSubmittedDate(s.submittedAt),
+                                    style: TextStyle(
+                                        fontSize: 12, color: Colors.grey.shade600)),
+                              ],
+                            ),
+                          ),
                         ),
                       ),
                     )),
                 SizedBox(
                   width: double.infinity,
                   child: OutlinedButton(
-                    onPressed: () => context.go('/teacher/classes'),
-                    style: OutlinedButton.styleFrom(foregroundColor: AppTheme.primary),
+                    onPressed: () {
+                      if (pending.isEmpty) {
+                        context.push('/teacher/classes');
+                        return;
+                      }
+                      final aid = pending.first.assignmentId.trim();
+                      if (aid.isEmpty) {
+                        context.push('/teacher/classes');
+                        return;
+                      }
+                      context.push('/teacher/assignments/$aid');
+                    },
+                    style: OutlinedButton.styleFrom(
+                        foregroundColor: AppTheme.primary),
                     child: Text(lang.t('actions.viewSubmissions')),
                   ),
                 ),
@@ -1095,23 +1155,42 @@ class TeacherDashboardScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildMyClassesCard(BuildContext context, LanguageProvider lang, List<ClassEntity> myClasses) {
+  Widget _buildMyClassesCard(BuildContext context, LanguageProvider lang,
+      List<ClassEntity> myClasses) {
     return Card(
       elevation: 1,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: BorderSide(color: AppTheme.primary.withValues(alpha: 0.2), width: 2)),
+      shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: BorderSide(
+              color: AppTheme.primary.withValues(alpha: 0.2), width: 2)),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            decoration: BoxDecoration(color: AppTheme.primary.withValues(alpha: 0.06), borderRadius: const BorderRadius.vertical(top: Radius.circular(10))),
+            decoration: BoxDecoration(
+                color: AppTheme.primary.withValues(alpha: 0.06),
+                borderRadius:
+                    const BorderRadius.vertical(top: Radius.circular(10))),
             child: Row(
               children: [
-                Expanded(child: Text(lang.t('classes.myClasses'), style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600))),
+                Expanded(
+                    child: Text(lang.t('classes.myClasses'),
+                        style: Theme.of(context)
+                            .textTheme
+                            .titleMedium
+                            ?.copyWith(fontWeight: FontWeight.w600))),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(color: AppTheme.accent.withValues(alpha: 0.2), borderRadius: BorderRadius.circular(6)),
-                  child: Text('${myClasses.length}', style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: AppTheme.accent)),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                      color: AppTheme.accent.withValues(alpha: 0.2),
+                      borderRadius: BorderRadius.circular(6)),
+                  child: Text('${myClasses.length}',
+                      style: const TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w600,
+                          color: AppTheme.accent)),
                 ),
               ],
             ),
@@ -1128,24 +1207,61 @@ class TeacherDashboardScreen extends StatelessWidget {
                         child: Container(
                           width: double.infinity,
                           padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(border: Border.all(color: AppTheme.primary.withValues(alpha: 0.2)), borderRadius: BorderRadius.circular(10)),
+                          decoration: BoxDecoration(
+                              border: Border.all(
+                                  color:
+                                      AppTheme.primary.withValues(alpha: 0.2)),
+                              borderRadius: BorderRadius.circular(10)),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Row(
                                 children: [
-                                  Expanded(child: Text(c.subject, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600))),
+                                  Expanded(
+                                      child: Text(c.subject,
+                                          style: const TextStyle(
+                                              fontSize: 14,
+                                              fontWeight: FontWeight.w600))),
                                   Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                    decoration: BoxDecoration(color: AppTheme.secondary.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(6), border: Border.all(color: AppTheme.secondary.withValues(alpha: 0.3))),
-                                    child: Text(c.level, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w500, color: AppTheme.secondary)),
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 8, vertical: 4),
+                                    decoration: BoxDecoration(
+                                        color: AppTheme.secondary
+                                            .withValues(alpha: 0.15),
+                                        borderRadius: BorderRadius.circular(6),
+                                        border: Border.all(
+                                            color: AppTheme.secondary
+                                                .withValues(alpha: 0.3))),
+                                    child: Text(c.level,
+                                        style: TextStyle(
+                                            fontSize: 10,
+                                            fontWeight: FontWeight.w500,
+                                            color: AppTheme.secondary)),
                                   ),
                                 ],
                               ),
                               const SizedBox(height: 8),
-                              Row(children: [Icon(Icons.calendar_today, size: 14, color: Colors.grey.shade600), const SizedBox(width: 6), Expanded(child: Text(c.schedule, style: TextStyle(fontSize: 12, color: Colors.grey.shade600)))]),
+                              Row(children: [
+                                Icon(Icons.calendar_today,
+                                    size: 14, color: Colors.grey.shade600),
+                                const SizedBox(width: 6),
+                                Expanded(
+                                    child: Text(c.schedule,
+                                        style: TextStyle(
+                                            fontSize: 12,
+                                            color: Colors.grey.shade600)))
+                              ]),
                               const SizedBox(height: 4),
-                              Row(children: [Icon(Icons.people, size: 14, color: Colors.grey.shade600), const SizedBox(width: 6), Text('${c.students} ${lang.t('classes.students')}', style: TextStyle(fontSize: 12, color: Colors.grey.shade600))]),
+                              Row(children: [
+                                Icon(Icons.people,
+                                    size: 14, color: Colors.grey.shade600),
+                                const SizedBox(width: 6),
+                                Text(
+                                    '${c.students} ${lang.t('classes.students')}',
+                                    style: TextStyle(
+                                        fontSize: 12,
+                                        color: Colors.grey.shade600))
+                              ]),
                             ],
                           ),
                         ),
@@ -1155,7 +1271,8 @@ class TeacherDashboardScreen extends StatelessWidget {
                   width: double.infinity,
                   child: OutlinedButton(
                     onPressed: () => context.go('/teacher/classes'),
-                    style: OutlinedButton.styleFrom(foregroundColor: AppTheme.primary),
+                    style: OutlinedButton.styleFrom(
+                        foregroundColor: AppTheme.primary),
                     child: Text(lang.t('common.viewAll')),
                   ),
                 ),
@@ -1171,7 +1288,20 @@ class TeacherDashboardScreen extends StatelessWidget {
     try {
       final d = DateTime.tryParse(iso);
       if (d != null) {
-        const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        const months = [
+          'Jan',
+          'Feb',
+          'Mar',
+          'Apr',
+          'May',
+          'Jun',
+          'Jul',
+          'Aug',
+          'Sep',
+          'Oct',
+          'Nov',
+          'Dec'
+        ];
         return 'Submitted ${months[d.month - 1]} ${d.day}';
       }
     } catch (_) {}
@@ -1185,7 +1315,11 @@ class _StatCard extends StatelessWidget {
   final IconData icon;
   final Color color;
 
-  const _StatCard({required this.title, required this.value, required this.icon, required this.color});
+  const _StatCard(
+      {required this.title,
+      required this.value,
+      required this.icon,
+      required this.color});
 
   @override
   Widget build(BuildContext context) {
@@ -1199,13 +1333,25 @@ class _StatCard extends StatelessWidget {
           children: [
             Container(
               padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(color: color.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(8)),
+              decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(8)),
               child: Icon(icon, color: color, size: 20),
             ),
             const SizedBox(height: 8),
-            Text(value, style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
+            Text(value,
+                style: Theme.of(context)
+                    .textTheme
+                    .titleLarge
+                    ?.copyWith(fontWeight: FontWeight.bold)),
             const SizedBox(height: 2),
-            Text(title, style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.grey.shade600), maxLines: 2, overflow: TextOverflow.ellipsis),
+            Text(title,
+                style: Theme.of(context)
+                    .textTheme
+                    .bodySmall
+                    ?.copyWith(color: Colors.grey.shade600),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis),
           ],
         ),
       ),
@@ -1243,7 +1389,8 @@ class _TeacherDashboardData {
   final List<TeacherDashboardRecentSubmission>? recentSubmissionsApi;
   final List<TeacherDashboardClassPreview>? myClassesPreviewApi;
 
-  factory _TeacherDashboardData.fromApi(TeacherDashboardEntity api, List<ClassEntity> classesForActions) {
+  factory _TeacherDashboardData.fromApi(
+      TeacherDashboardEntity api, List<ClassEntity> classesForActions) {
     return _TeacherDashboardData(
       isFromApi: true,
       cardsMyClasses: api.cards.myClasses,

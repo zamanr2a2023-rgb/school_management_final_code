@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
+import 'package:high_school/core/constants/app_constants.dart';
 import 'package:high_school/core/theme/app_theme.dart';
+import 'package:high_school/presentation/widgets/garini_logo.dart';
 import 'package:high_school/presentation/providers/auth_provider.dart';
 import 'package:high_school/presentation/providers/language_provider.dart';
 import 'package:high_school/presentation/widgets/language_selector_widget.dart';
@@ -41,7 +43,6 @@ class _LoginBodyState extends State<_LoginBody> {
       _loading = true;
     });
     final auth = context.read<AuthProvider>();
-    final lang = context.read<LanguageProvider>();
     final phone = _phoneController.text.trim();
     final pin = _pinController.text;
 
@@ -86,13 +87,14 @@ class _LoginBodyState extends State<_LoginBody> {
                 ),
                 child: Column(
                   children: [
-                    const Icon(Icons.school, size: 48, color: Colors.white),
+                    const GariniLogo(size: 96, fit: BoxFit.contain),
                     const SizedBox(height: 16),
                     Text(
-                      'Nouadhibou High School',
+                      AppConstants.appName,
                       style: Theme.of(context).textTheme.titleLarge?.copyWith(
                             color: Colors.white,
                             fontWeight: FontWeight.bold,
+                            letterSpacing: 0.5,
                           ),
                       textAlign: TextAlign.center,
                     ),

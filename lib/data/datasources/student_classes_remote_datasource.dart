@@ -276,7 +276,12 @@ class StudentClassesRemoteDatasource {
     }
     final p = m['points'];
     final points = p is int ? p : int.tryParse(p?.toString() ?? '') ?? 0;
-    final statusStr = (m['status']?.toString() ?? 'pending').toLowerCase();
+    // Student class detail API: `status` is assignment lifecycle (e.g. active/closed).
+    // Student progress uses `myStatus` (pending / submitted / graded).
+    final myStatusRaw = m['myStatus']?.toString().trim().toLowerCase() ?? '';
+    final fallbackStatus = (m['status']?.toString() ?? 'pending').toLowerCase();
+    final statusStr =
+        myStatusRaw.isNotEmpty ? myStatusRaw : fallbackStatus;
     AssignmentStatus st = AssignmentStatus.pending;
     if (statusStr.contains('grad')) {
       st = AssignmentStatus.graded;

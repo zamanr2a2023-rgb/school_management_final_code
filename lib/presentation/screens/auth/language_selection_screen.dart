@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:high_school/core/constants/app_constants.dart';
 import 'package:high_school/core/theme/app_theme.dart';
+import 'package:high_school/presentation/widgets/garini_logo.dart';
 import 'package:high_school/presentation/providers/language_provider.dart';
 import 'package:high_school/core/l10n/app_translations.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -27,9 +28,12 @@ class LanguageSelectionScreen extends StatelessWidget {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Icon(Icons.school, size: 64, color: AppTheme.primary),
+              GariniLogo(size: 100, fit: BoxFit.contain, fallbackColor: AppTheme.primary),
               const SizedBox(height: 16),
-              Text('Nouadhibou High School', style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold)),
+              Text(
+                AppConstants.appName,
+                style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
+              ),
               const SizedBox(height: 8),
               Text('Online Learning Platform', style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Colors.grey)),
               const SizedBox(height: 32),

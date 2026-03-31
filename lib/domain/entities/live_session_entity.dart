@@ -12,6 +12,15 @@ class LiveSessionEntity {
   /// From API: e.g. "5th Grade - English A". Used for upcoming card when set.
   final String? className;
 
+  /// From teacher sessions API (`grade`).
+  final String? gradeLevel;
+
+  /// From teacher sessions API (`subject`).
+  final String? subject;
+
+  /// Scheduled duration in minutes (`duration` from API).
+  final int? durationMinutes;
+
   const LiveSessionEntity({
     required this.id,
     required this.classId,
@@ -22,5 +31,8 @@ class LiveSessionEntity {
     required this.link,
     required this.isActive,
     this.className,
+    this.gradeLevel,
+    this.subject,
+    this.durationMinutes,
   });
 }

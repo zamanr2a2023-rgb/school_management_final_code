@@ -2,12 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:high_school/core/theme/app_theme.dart';
-import 'package:high_school/domain/entities/assignment_entity.dart';
-import 'package:high_school/domain/entities/class_entity.dart';
-import 'package:high_school/domain/entities/student_entity.dart';
-import 'package:high_school/domain/repositories/students_repository.dart';
-import 'package:high_school/domain/repositories/classes_repository.dart';
 import 'package:high_school/data/datasources/mock_data.dart';
+import 'package:high_school/domain/entities/teacher_roster_student_entity.dart';
+import 'package:high_school/domain/repositories/teacher_students_repository.dart';
 import 'package:high_school/presentation/providers/language_provider.dart';
 
 class TeacherStudentDetailScreen extends StatefulWidget {
@@ -20,15 +17,35 @@ class TeacherStudentDetailScreen extends StatefulWidget {
 }
 
 class _TeacherStudentDetailScreenState extends State<TeacherStudentDetailScreen> {
-  String _selectedClassId = 'class1';
   String _attendanceDate = '';
   String _attendanceStatus = 'present';
   final _attendanceNotes = TextEditingController();
+
+  Future<TeacherRosterStudentEntity?>? _detailFuture;
+  String? _detailFutureStudentId;
 
   @override
   void initState() {
     super.initState();
     _attendanceDate = _formatDateForInput(DateTime.now());
+  }
+
+  @override
+  void didUpdateWidget(covariant TeacherStudentDetailScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.studentId != widget.studentId) {
+      _detailFutureStudentId = widget.studentId;
+      _detailFuture = context.read<TeacherStudentsRepository>().getStudentDetail(widget.studentId);
+    }
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_detailFutureStudentId != widget.studentId) {
+      _detailFutureStudentId = widget.studentId;
+      _detailFuture = context.read<TeacherStudentsRepository>().getStudentDetail(widget.studentId);
+    }
   }
 
   @override
@@ -41,56 +58,67 @@ class _TeacherStudentDetailScreenState extends State<TeacherStudentDetailScreen>
     return '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
   }
 
+  StudentProgressData _progressFromRoster(TeacherRosterStudentEntity roster, String classId) {
+    final perf = roster.performance;
+    var completed = 0;
+    var total = roster.assignmentProgress.length;
+    var overall = roster.avgGradePercent;
+    var lastAct = '';
+
+    if (perf != null) {
+      overall = perf.overallGrade.round().clamp(0, 100);
+      final parts = perf.assignmentCompletion.split('/');
+      if (parts.length == 2) {
+        completed = int.tryParse(parts[0].trim()) ?? 0;
+        final t = int.tryParse(parts[1].trim());
+        if (t != null && t > 0) total = t;
+      }
+      if (total <= 0 && perf.totalAssignments > 0) {
+        total = perf.totalAssignments;
+      }
+      lastAct = perf.lastActivity?.trim() ?? '';
+    }
+    if (total <= 0) {
+      total = roster.assignmentProgress.isEmpty ? 1 : roster.assignmentProgress.length;
+    }
+
+    return StudentProgressData(
+      studentId: roster.id,
+      classId: classId,
+      overallGrade: overall,
+      assignmentsCompleted: completed,
+      assignmentsTotal: total,
+      present: 0,
+      absent: 0,
+      late: 0,
+      total: 0,
+      lastActivity: lastAct,
+    );
+  }
+
+  static String _firstClassId(TeacherRosterStudentEntity roster) {
+    for (final c in roster.classes) {
+      if (c.classId.isNotEmpty) return c.classId;
+    }
+    return '';
+  }
+
   @override
   Widget build(BuildContext context) {
     final lang = context.watch<LanguageProvider>();
 
-    return FutureBuilder(
-      future: Future.wait([
-        context.read<StudentsRepository>().getStudentById(widget.studentId),
-        context.read<ClassesRepository>().getClasses(),
-      ]),
+    return FutureBuilder<TeacherRosterStudentEntity?>(
+      future: _detailFuture,
       builder: (context, snapshot) {
-        if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
-        final student = (snapshot.data![0] as StudentEntity?);
-        final allClasses = (snapshot.data![1] as List<ClassEntity>);
-        if (student == null) {
+        if (snapshot.connectionState != ConnectionState.done) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        final roster = snapshot.data;
+        if (roster == null) {
           return _buildNotFound(context, lang);
         }
-        final studentClassIds = MockData.studentSubscriptions
-            .where((s) => s.studentId == widget.studentId)
-            .map((s) => s.enrolledClassIds)
-            .expand((e) => e)
-            .toSet()
-            .toList();
-        if (studentClassIds.isEmpty) studentClassIds.addAll(['class1', 'class2']);
-        final studentClasses = allClasses.where((c) => studentClassIds.contains(c.id)).toList();
-        if (studentClasses.isNotEmpty && !studentClassIds.contains(_selectedClassId)) {
-          _selectedClassId = studentClasses.first.id;
-        }
-        final attendanceRecords = MockData.attendanceRecords
-            .where((a) => a.studentId == widget.studentId && a.classId == _selectedClassId)
-            .toList();
-        StudentProgressData? progressData;
-        try {
-          progressData = MockData.studentProgressList.firstWhere((p) => p.studentId == widget.studentId && p.classId == _selectedClassId);
-        } catch (_) {}
-        if (progressData == null) {
-          progressData = StudentProgressData(
-            studentId: widget.studentId,
-            classId: _selectedClassId,
-            overallGrade: student.grade,
-            assignmentsCompleted: 0,
-            assignmentsTotal: 0,
-            present: 0,
-            absent: 0,
-            late: 0,
-            total: 0,
-            lastActivity: DateTime.now().toIso8601String(),
-          );
-        }
-        final classAssignments = MockData.assignments.where((a) => a.classId == _selectedClassId).toList();
-        final studentSubmissionsList = MockData.submissions.where((s) => s.studentId == widget.studentId).toList();
+
+        final progressData = _progressFromRoster(roster, _firstClassId(roster));
 
         return Material(
           color: Colors.transparent,
@@ -99,14 +127,11 @@ class _TeacherStudentDetailScreenState extends State<TeacherStudentDetailScreen>
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _buildHeader(context, lang, student),
-                const SizedBox(height: 16),
-                _buildClassSelector(context, lang, studentClasses),
+                _buildHeader(context, lang, roster),
                 const SizedBox(height: 16),
                 _buildPerformanceOverview(context, lang, progressData),
                 const SizedBox(height: 16),
-                _buildAssignmentProgress(
-                    context, lang, classAssignments, studentSubmissionsList),
+                _buildAssignmentProgressFromRoster(context, lang, roster.assignmentProgress),
               ],
             ),
           ),
@@ -150,7 +175,9 @@ class _TeacherStudentDetailScreenState extends State<TeacherStudentDetailScreen>
     );
   }
 
-  Widget _buildHeader(BuildContext context, LanguageProvider lang, StudentEntity student) {
+  Widget _buildHeader(BuildContext context, LanguageProvider lang, TeacherRosterStudentEntity roster) {
+    final contact = roster.primaryContact;
+    final useEmail = roster.hasEmail;
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(16),
@@ -178,7 +205,7 @@ class _TeacherStudentDetailScreenState extends State<TeacherStudentDetailScreen>
                 decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.2), shape: BoxShape.circle),
                 alignment: Alignment.center,
                 child: Text(
-                  student.name.split(' ').map((s) => s.isNotEmpty ? s[0] : '').join('').toUpperCase(),
+                  roster.name.split(' ').map((s) => s.isNotEmpty ? s[0] : '').join('').toUpperCase(),
                   style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
                 ),
               ),
@@ -187,15 +214,21 @@ class _TeacherStudentDetailScreenState extends State<TeacherStudentDetailScreen>
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(student.name, style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
-                    const SizedBox(height: 4),
-                    Row(
-                      children: [
-                        Icon(Icons.email_outlined, size: 16, color: Colors.white.withValues(alpha: 0.9)),
-                        const SizedBox(width: 6),
-                        Expanded(child: Text(student.email, style: TextStyle(color: Colors.white.withValues(alpha: 0.9), fontSize: 14))),
-                      ],
-                    ),
+                    Text(roster.name, style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
+                    if (roster.gradeLevel.isNotEmpty) ...[
+                      const SizedBox(height: 4),
+                      Text(roster.gradeLevel, style: TextStyle(color: Colors.white.withValues(alpha: 0.85), fontSize: 14)),
+                    ],
+                    if (contact.isNotEmpty) ...[
+                      const SizedBox(height: 4),
+                      Row(
+                        children: [
+                          Icon(useEmail ? Icons.email_outlined : Icons.phone_outlined, size: 16, color: Colors.white.withValues(alpha: 0.9)),
+                          const SizedBox(width: 6),
+                          Expanded(child: Text(contact, style: TextStyle(color: Colors.white.withValues(alpha: 0.9), fontSize: 14))),
+                        ],
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -206,43 +239,19 @@ class _TeacherStudentDetailScreenState extends State<TeacherStudentDetailScreen>
     );
   }
 
-  Widget _buildClassSelector(BuildContext context, LanguageProvider lang, List<ClassEntity> studentClasses) {
-    if (studentClasses.isEmpty) return const SizedBox.shrink();
-    return Card(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: BorderSide(color: AppTheme.primary.withValues(alpha: 0.2))),
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(lang.t('students.selectClass'), style: Theme.of(context).textTheme.labelLarge?.copyWith(color: AppTheme.primary, fontWeight: FontWeight.w600)),
-            const SizedBox(height: 8),
-            DropdownButtonFormField<String>(
-              value: _selectedClassId,
-              decoration: InputDecoration(
-                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: AppTheme.primary.withValues(alpha: 0.2))),
-              ),
-              items: studentClasses.map((c) => DropdownMenuItem(value: c.id, child: Text(c.name))).toList(),
-              onChanged: (v) => setState(() => _selectedClassId = v ?? _selectedClassId),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
   Widget _buildPerformanceOverview(
       BuildContext context, LanguageProvider lang, StudentProgressData progress) {
     final assignmentPct = progress.assignmentsTotal > 0
         ? ((progress.assignmentsCompleted / progress.assignmentsTotal) * 100)
             .round()
         : 0;
-    String lastActivityStr = progress.lastActivity;
-    try {
-      final d = DateTime.parse(progress.lastActivity);
-      lastActivityStr = '${_monthShort(d.month)} ${d.day}, ${d.year}';
-    } catch (_) {}
+    var lastActivityStr = progress.lastActivity.trim().isEmpty ? '—' : progress.lastActivity;
+    if (progress.lastActivity.trim().isNotEmpty) {
+      try {
+        final d = DateTime.parse(progress.lastActivity);
+        lastActivityStr = '${_monthShort(d.month)} ${d.day}, ${d.year}';
+      } catch (_) {}
+    }
     return Card(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: BorderSide(color: AppTheme.primary.withValues(alpha: 0.2))),
       child: Column(
@@ -456,7 +465,8 @@ class _TeacherStudentDetailScreenState extends State<TeacherStudentDetailScreen>
     );
   }
 
-  Widget _buildAssignmentProgress(BuildContext context, LanguageProvider lang, List<AssignmentEntity> classAssignments, List<SubmissionEntity> studentSubmissions) {
+  Widget _buildAssignmentProgressFromRoster(
+      BuildContext context, LanguageProvider lang, List<TeacherAssignmentProgressItemEntity> items) {
     return Card(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: BorderSide(color: AppTheme.primary.withValues(alpha: 0.2))),
       child: Column(
@@ -475,36 +485,41 @@ class _TeacherStudentDetailScreenState extends State<TeacherStudentDetailScreen>
           ),
           Padding(
             padding: const EdgeInsets.all(16),
-            child: classAssignments.isEmpty
+            child: items.isEmpty
                 ? Padding(
                     padding: const EdgeInsets.symmetric(vertical: 24),
                     child: Center(child: Text(lang.t('students.noAssignmentsForClass'), style: TextStyle(fontSize: 12, color: Colors.grey.shade600))),
                   )
                 : Column(
-                    children: classAssignments.map<Widget>((a) {
-                      SubmissionEntity? sub;
-                      try {
-                        sub = studentSubmissions.firstWhere((s) => s.assignmentId == a.id);
-                      } catch (_) {}
-                      final hasSubmitted = sub != null;
-                      final isGraded = sub != null && sub.status == 'graded';
-                      String badgeText;
-                      Color badgeColor;
-                      if (isGraded) {
-                        badgeText = '${sub.grade ?? 0}/${a.points}';
+                    children: items.map<Widget>((a) {
+                      final status = a.status.toLowerCase();
+                      final isGraded = status == 'graded';
+                      final isSubmitted = status == 'submitted' || isGraded;
+                      late String badgeText;
+                      late Color badgeColor;
+                      if (isGraded && a.score != null) {
+                        badgeText = '${a.score}/${a.points}';
                         badgeColor = AppTheme.secondary;
-                      } else if (hasSubmitted) {
+                      } else if (isGraded) {
+                        badgeText = lang.t('assignments.graded');
+                        badgeColor = AppTheme.secondary;
+                      } else if (isSubmitted) {
                         badgeText = lang.t('students.submitted');
                         badgeColor = AppTheme.accent;
                       } else {
                         badgeText = lang.t('students.pending');
                         badgeColor = Colors.red;
                       }
-                      String dueStr = a.dueDate;
-                      try {
-                        final d = DateTime.parse(a.dueDate);
-                        dueStr = '${_monthShort(d.month)} ${d.day}';
-                      } catch (_) {}
+                      var dueStr = a.dueAt ?? '';
+                      if (dueStr.isNotEmpty) {
+                        try {
+                          final d = DateTime.parse(dueStr);
+                          dueStr = '${_monthShort(d.month)} ${d.day}';
+                        } catch (_) {}
+                      } else {
+                        dueStr = '—';
+                      }
+                      final feedback = a.feedback?.trim();
                       return Padding(
                         padding: const EdgeInsets.only(bottom: 12),
                         child: Container(
@@ -533,7 +548,7 @@ class _TeacherStudentDetailScreenState extends State<TeacherStudentDetailScreen>
                                   Text('${a.points} ${lang.t('students.pts')}', style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
                                 ],
                               ),
-                              if (sub?.feedback != null && sub!.feedback!.isNotEmpty) ...[
+                              if (feedback != null && feedback.isNotEmpty) ...[
                                 const SizedBox(height: 8),
                                 Container(
                                   padding: const EdgeInsets.all(8),
@@ -543,7 +558,7 @@ class _TeacherStudentDetailScreenState extends State<TeacherStudentDetailScreen>
                                       style: TextStyle(fontSize: 10, color: Colors.grey.shade600),
                                       children: [
                                         TextSpan(text: '${lang.t('students.feedback')}: ', style: const TextStyle(color: AppTheme.primary, fontWeight: FontWeight.w600)),
-                                        TextSpan(text: sub.feedback ?? ''),
+                                        TextSpan(text: feedback),
                                       ],
                                     ),
                                   ),
@@ -585,7 +600,7 @@ class _TeacherStudentDetailScreenState extends State<TeacherStudentDetailScreen>
                   Text('Status', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
                   const SizedBox(height: 4),
                   DropdownButtonFormField<String>(
-                    value: _attendanceStatus,
+                    initialValue: _attendanceStatus,
                     items: [
                       DropdownMenuItem(value: 'present', child: Text(lang.t('students.present'))),
                       DropdownMenuItem(value: 'absent', child: Text(lang.t('students.absent'))),

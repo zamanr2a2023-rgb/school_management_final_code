@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
+import 'package:high_school/core/constants/app_constants.dart';
 import 'package:high_school/core/theme/app_theme.dart';
+import 'package:high_school/presentation/widgets/garini_logo.dart';
 import 'package:high_school/domain/entities/user_entity.dart';
 import 'package:high_school/presentation/providers/auth_provider.dart';
 import 'package:high_school/presentation/providers/language_provider.dart';
@@ -42,12 +44,16 @@ class LayoutWidget extends StatelessWidget {
     void onBackPressed() {
       if (context.canPop()) {
         context.pop();
-      } else {
-        final segments = location.split('/').where((s) => s.isNotEmpty).toList();
-        if (segments.length > 2) {
-          final parentPath = '/${segments.sublist(0, segments.length - 1).join('/')}';
-          context.go(parentPath);
+        return;
+      }
+      final segments = location.split('/').where((s) => s.isNotEmpty).toList();
+      if (segments.length > 2) {
+        var parentPath = '/${segments.sublist(0, segments.length - 1).join('/')}';
+        // No index route for /teacher/assignments (only /teacher/assignments/:id).
+        if (parentPath == '/teacher/assignments') {
+          parentPath = '/teacher/classes';
         }
+        context.go(parentPath);
       }
     }
 
@@ -71,9 +77,19 @@ class LayoutWidget extends StatelessWidget {
                     Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Icon(Icons.school, color: AppTheme.primary, size: 28),
+                        GariniLogo(
+                          size: 32,
+                          fit: BoxFit.cover,
+                          fallbackColor: AppTheme.primary,
+                        ),
                         const SizedBox(width: 8),
-                        Text('Nouadhibou HS', style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold, color: AppTheme.primary)),
+                        Text(
+                          AppConstants.appName,
+                          style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                                fontWeight: FontWeight.bold,
+                                color: AppTheme.primary,
+                              ),
+                        ),
                       ],
                     ),
                   const Spacer(),

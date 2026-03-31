@@ -14,7 +14,7 @@ class StudentTimetableRemoteDatasource {
   final String _baseUrl;
 
   String get _apiBase =>
-      _baseUrl.endsWith('/') ? '${_baseUrl}api/v1' : '${_baseUrl}/api/v1';
+      _baseUrl.endsWith('/') ? '${_baseUrl}api/v1' : '$_baseUrl/api/v1';
 
   bool get isConfigured => _baseUrl.isNotEmpty;
 

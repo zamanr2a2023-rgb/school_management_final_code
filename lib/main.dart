@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:high_school/core/constants/app_constants.dart';
 import 'package:high_school/core/network/unauthorized_handler.dart';
 import 'package:high_school/core/theme/app_theme.dart';
 import 'package:high_school/core/router/app_router.dart';
@@ -55,7 +56,7 @@ void main() async {
   final AuthRepository authRepo = AuthRepositoryImpl(prefs);
   final ClassesRepository classesRepo = ClassesRepositoryImpl(prefs);
   final LessonsRepository lessonsRepo = LessonsRepositoryImpl();
-  final AssignmentsRepository assignmentsRepo = AssignmentsRepositoryImpl();
+  final AssignmentsRepository assignmentsRepo = AssignmentsRepositoryImpl(prefs);
   final StudentsRepository studentsRepo = StudentsRepositoryImpl();
   final TimetableRepository timetableRepo = TimetableRepositoryImpl(prefs);
   final LiveSessionsRepository liveSessionsRepo =
@@ -134,7 +135,7 @@ void main() async {
             value: studentLessonRemoteDatasource),
       ],
       child: MaterialApp.router(
-        title: 'Nouadhibou High School',
+        title: AppConstants.appName,
         debugShowCheckedModeBanner: false,
         theme: AppTheme.light,
         routerConfig: router,

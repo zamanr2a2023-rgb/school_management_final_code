@@ -4,9 +4,13 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:high_school/core/theme/app_theme.dart';
 import 'package:high_school/domain/entities/class_entity.dart';
 import 'package:high_school/domain/entities/live_session_entity.dart';
+import 'package:high_school/domain/entities/teacher_live_sessions_overview.dart';
 import 'package:high_school/domain/repositories/classes_repository.dart';
 import 'package:high_school/domain/repositories/live_sessions_repository.dart';
+import 'package:high_school/domain/repositories/teacher_classes_repository.dart';
+import 'package:high_school/presentation/providers/auth_provider.dart';
 import 'package:high_school/presentation/providers/language_provider.dart';
+import 'package:high_school/presentation/screens/teacher/teacher_live_session_create_dialog.dart';
 
 // Reference colors from design: dark blue header, green for live cards, red for LIVE/delete
 const Color _liveGreen = Color(0xFF4CAF50);
@@ -24,6 +28,31 @@ class TeacherLiveSessionsScreen extends StatefulWidget {
 }
 
 class _TeacherLiveSessionsScreenState extends State<TeacherLiveSessionsScreen> {
+  Future<({TeacherLiveSessionsOverview overview, List<ClassEntity> classes})>? _pageFuture;
+
+  /// Bumped on each pull-to-refresh / reload so [FutureBuilder] gets a new element and
+  /// subscribes to the new future (otherwise the UI can keep showing stale data).
+  int _futureKey = 0;
+
+  /// Last good payload; shown while a new request is in flight after refresh.
+  ({TeacherLiveSessionsOverview overview, List<ClassEntity> classes})? _lastPageData;
+
+  Future<({TeacherLiveSessionsOverview overview, List<ClassEntity> classes})> _loadPage() async {
+    final live = context.read<LiveSessionsRepository>();
+    final classesRepo = context.read<ClassesRepository>();
+    final overview = await live.getTeacherSessionsOverview();
+    final classes = await classesRepo.getClasses();
+    return (overview: overview, classes: classes);
+  }
+
+  Future<void> _reload() async {
+    final f = _loadPage();
+    setState(() {
+      _futureKey++;
+      _pageFuture = f;
+    });
+    await f;
+  }
 
   static String _formatDate(String dateStr) {
     try {
@@ -39,20 +68,33 @@ class _TeacherLiveSessionsScreenState extends State<TeacherLiveSessionsScreen> {
   @override
   Widget build(BuildContext context) {
     final lang = context.watch<LanguageProvider>();
+    _pageFuture ??= _loadPage();
 
-    return FutureBuilder(
-      future: Future.wait([
-        context.read<LiveSessionsRepository>().getLiveSessions(),
-        context.read<ClassesRepository>().getClasses(),
-      ]),
+    return FutureBuilder<({TeacherLiveSessionsOverview overview, List<ClassEntity> classes})>(
+      key: ValueKey<int>(_futureKey),
+      future: _pageFuture,
       builder: (context, snapshot) {
-        if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
-        final sessions = (snapshot.data![0] as List).cast<LiveSessionEntity>();
-        final classes = (snapshot.data![1] as List).cast<ClassEntity>();
-        final liveSessions = sessions.where((s) => s.isActive).toList();
-        final upcomingSessions = sessions.where((s) => !s.isActive).toList();
+        if (snapshot.hasData) {
+          _lastPageData = snapshot.data;
+        }
+        final data = snapshot.hasData
+            ? snapshot.data!
+            : (_lastPageData != null &&
+                    (snapshot.connectionState == ConnectionState.waiting ||
+                        snapshot.hasError)
+                ? _lastPageData!
+                : null);
+        if (data == null) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        final overview = data.overview;
+        final classes = data.classes;
+        final liveSessions = overview.activeNow;
+        final upcomingSessions = overview.upcoming;
+        final completedSessions = overview.completed;
 
         ClassEntity? classFor(LiveSessionEntity s) {
+          if (s.classId.isEmpty) return null;
           try {
             return classes.firstWhere((c) => c.id == s.classId);
           } catch (_) {
@@ -60,28 +102,68 @@ class _TeacherLiveSessionsScreenState extends State<TeacherLiveSessionsScreen> {
           }
         }
 
-        return Material(
-          color: Colors.transparent,
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.only(bottom: 24),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildHeader(context, lang),
-                const SizedBox(height: 16),
-                if (liveSessions.isNotEmpty) ...[
-                  _buildSectionTitle(context, lang.t('live.activeNow'), liveSessions.length, isLive: true),
+        return RefreshIndicator(
+          onRefresh: _reload,
+          child: Material(
+            color: Colors.transparent,
+            child: SingleChildScrollView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: const EdgeInsets.only(bottom: 24),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildHeader(context, lang),
+                  const SizedBox(height: 16),
+                  if (liveSessions.isNotEmpty) ...[
+                    _buildSectionTitle(context, lang.t('live.activeNow'), liveSessions.length, isLive: true),
+                    const SizedBox(height: 8),
+                    ...liveSessions.map(
+                      (s) => _buildSessionCard(
+                        context,
+                        lang,
+                        s,
+                        classFor(s),
+                        isLive: true,
+                        isCompleted: false,
+                        showDelete: !overview.fromRemote,
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                  ],
+                  _buildSectionTitle(context, lang.t('live.upcomingSessions'), upcomingSessions.length, isLive: false),
                   const SizedBox(height: 8),
-                  ...liveSessions.map((s) => _buildSessionCard(context, lang, s, classFor(s), isLive: true)),
-                  const SizedBox(height: 20),
+                  if (upcomingSessions.isEmpty)
+                    _buildEmptyUpcoming(context, lang)
+                  else
+                    ...upcomingSessions.map(
+                      (s) => _buildSessionCard(
+                        context,
+                        lang,
+                        s,
+                        classFor(s),
+                        isLive: false,
+                        isCompleted: false,
+                        showDelete: !overview.fromRemote,
+                      ),
+                    ),
+                  if (completedSessions.isNotEmpty) ...[
+                    const SizedBox(height: 20),
+                    _buildSectionTitle(context, lang.t('live.completedSessions'), completedSessions.length, isLive: false),
+                    const SizedBox(height: 8),
+                    ...completedSessions.map(
+                      (s) => _buildSessionCard(
+                        context,
+                        lang,
+                        s,
+                        classFor(s),
+                        isLive: false,
+                        isCompleted: true,
+                        showDelete: false,
+                      ),
+                    ),
+                  ],
                 ],
-                _buildSectionTitle(context, lang.t('live.upcomingSessions'), upcomingSessions.length, isLive: false),
-                const SizedBox(height: 8),
-                if (upcomingSessions.isEmpty)
-                  _buildEmptyUpcoming(context, lang)
-                else
-                  ...upcomingSessions.map((s) => _buildSessionCard(context, lang, s, classFor(s), isLive: false)),
-              ],
+              ),
             ),
           ),
         );
@@ -114,7 +196,7 @@ class _TeacherLiveSessionsScreenState extends State<TeacherLiveSessionsScreen> {
           const SizedBox(width: 8),
           Flexible(
             child: ElevatedButton.icon(
-            onPressed: () => _showCreateSessionDialog(context, lang),
+            onPressed: () => _showPickClassThenCreateLiveSession(context, lang),
             icon: const Icon(Icons.add, size: 18),
             label: Text(lang.t('live.create')),
             style: ElevatedButton.styleFrom(
@@ -161,11 +243,25 @@ class _TeacherLiveSessionsScreenState extends State<TeacherLiveSessionsScreen> {
     );
   }
 
-  Widget _buildSessionCard(BuildContext context, LanguageProvider lang, LiveSessionEntity session, ClassEntity? cls, {required bool isLive}) {
-    // Active cards: dark green header; Upcoming: dark blue (primary)
-    final headerColor = isLive ? _liveGreen : AppTheme.primary;
+  Widget _buildSessionCard(
+    BuildContext context,
+    LanguageProvider lang,
+    LiveSessionEntity session,
+    ClassEntity? cls, {
+    required bool isLive,
+    required bool isCompleted,
+    required bool showDelete,
+  }) {
+    final headerColor = isLive
+        ? _liveGreen
+        : isCompleted
+            ? Colors.grey.shade600
+            : AppTheme.primary;
     final iconColor = isLive ? _liveGreenMuted : AppTheme.primary;
     final platformStr = session.platform == LiveSessionPlatform.zoom ? 'Zoom' : 'Google Meet';
+    final hasApiMeta = session.gradeLevel != null ||
+        session.subject != null ||
+        (session.className != null && session.className!.isNotEmpty);
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
@@ -202,7 +298,7 @@ class _TeacherLiveSessionsScreenState extends State<TeacherLiveSessionsScreen> {
                     children: [
                       Icon(Icons.school, size: 14, color: iconColor),
                       const SizedBox(width: 6),
-                      Flexible(child: Text('${cls.level}', style: TextStyle(fontSize: 12, color: Colors.grey.shade700), overflow: TextOverflow.ellipsis)),
+                      Flexible(child: Text(cls.level, style: TextStyle(fontSize: 12, color: Colors.grey.shade700), overflow: TextOverflow.ellipsis)),
                       const SizedBox(width: 8),
                       Icon(Icons.menu_book, size: 14, color: iconColor),
                       const SizedBox(width: 6),
@@ -218,8 +314,55 @@ class _TeacherLiveSessionsScreenState extends State<TeacherLiveSessionsScreen> {
                     ],
                   ),
                   const SizedBox(height: 8),
+                ] else if (hasApiMeta) ...[
+                  if (session.gradeLevel != null || session.subject != null)
+                    Row(
+                      children: [
+                        if (session.gradeLevel != null) ...[
+                          Icon(Icons.school, size: 14, color: iconColor),
+                          const SizedBox(width: 6),
+                          Flexible(
+                            child: Text(
+                              session.gradeLevel!,
+                              style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                        if (session.gradeLevel != null && session.subject != null) const SizedBox(width: 8),
+                        if (session.subject != null) ...[
+                          Icon(Icons.menu_book, size: 14, color: iconColor),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: Text(
+                              session.subject!,
+                              style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  if (session.className != null && session.className!.isNotEmpty) ...[
+                    if (session.gradeLevel != null || session.subject != null) const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Icon(Icons.calendar_today, size: 14, color: iconColor),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            session.className!,
+                            style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                  const SizedBox(height: 8),
                 ],
                 Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Icon(Icons.calendar_today, size: 14, color: iconColor),
                     const SizedBox(width: 6),
@@ -228,6 +371,16 @@ class _TeacherLiveSessionsScreenState extends State<TeacherLiveSessionsScreen> {
                     Icon(Icons.schedule, size: 14, color: iconColor),
                     const SizedBox(width: 6),
                     Flexible(child: Text(session.time, style: TextStyle(fontSize: 12, color: Colors.grey.shade700), overflow: TextOverflow.ellipsis)),
+                    if (session.durationMinutes != null) ...[
+                      const SizedBox(width: 8),
+                      Flexible(
+                        child: Text(
+                          '· ${session.durationMinutes} min',
+                          style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
                     const SizedBox(width: 6),
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
@@ -236,27 +389,46 @@ class _TeacherLiveSessionsScreenState extends State<TeacherLiveSessionsScreen> {
                     ),
                   ],
                 ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    if (isLive) ...[
-                      Expanded(
-                        child: ElevatedButton.icon(
-                          onPressed: () => _launchUrl(session.link),
-                          icon: const Icon(Icons.open_in_new, size: 16),
-                          label: Text(lang.t('live.startSession')),
-                          style: ElevatedButton.styleFrom(backgroundColor: _liveGreen, foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(vertical: 10)),
+                if ((isLive && session.link.isNotEmpty) ||
+                    (!isLive && !isCompleted && session.link.isNotEmpty) ||
+                    showDelete) ...[
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      if (isLive && session.link.isNotEmpty) ...[
+                        Expanded(
+                          child: ElevatedButton.icon(
+                            onPressed: () => _launchUrl(context, lang, session.link),
+                            icon: const Icon(Icons.open_in_new, size: 16),
+                            label: Text(lang.t('live.startSession')),
+                            style: ElevatedButton.styleFrom(backgroundColor: _liveGreen, foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(vertical: 10)),
+                          ),
                         ),
-                      ),
-                      const SizedBox(width: 8),
+                        if (showDelete) const SizedBox(width: 8),
+                      ] else if (!isLive && !isCompleted && session.link.isNotEmpty) ...[
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: () => _launchUrl(context, lang, session.link),
+                            icon: const Icon(Icons.open_in_new, size: 16),
+                            label: Text(lang.t('live.joinSession')),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: AppTheme.primary,
+                              side: BorderSide(color: AppTheme.primary.withValues(alpha: 0.4)),
+                              padding: const EdgeInsets.symmetric(vertical: 10),
+                            ),
+                          ),
+                        ),
+                        if (showDelete) const SizedBox(width: 8),
+                      ],
+                      if (showDelete)
+                        IconButton(
+                          onPressed: () => _confirmDelete(context, lang, session.title),
+                          icon: const Icon(Icons.delete_outline, size: 22, color: _liveRed),
+                          style: IconButton.styleFrom(backgroundColor: _liveRedLight),
+                        ),
                     ],
-                    IconButton(
-                      onPressed: () => _confirmDelete(context, lang, session.title),
-                      icon: const Icon(Icons.delete_outline, size: 22, color: _liveRed),
-                      style: IconButton.styleFrom(backgroundColor: _liveRedLight),
-                    ),
-                  ],
-                ),
+                  ),
+                ],
               ],
             ),
           ),
@@ -265,13 +437,122 @@ class _TeacherLiveSessionsScreenState extends State<TeacherLiveSessionsScreen> {
     );
   }
 
-  Future<void> _launchUrl(String url) async {
+  void _showOpenLinkFailed(BuildContext context, LanguageProvider lang) {
+    const k = 'live.openLinkFailed';
+    final t = lang.t(k);
+    final msg = (t == k || t.isEmpty)
+        ? 'Could not open the meeting link. Check the URL or try again in a browser.'
+        : t;
+    ScaffoldMessenger.maybeOf(context)?.showSnackBar(SnackBar(content: Text(msg)));
+  }
+
+  /// Opens Zoom/Meet/browser links. Does not rely on [canLaunchUrl] alone — on Android 11+
+  /// it often returns false without manifest `<queries>`; we still try [launchUrl].
+  Future<void> _launchUrl(
+    BuildContext context,
+    LanguageProvider lang,
+    String raw,
+  ) async {
+    final s = raw.trim();
+    if (s.isEmpty) {
+      if (context.mounted) _showOpenLinkFailed(context, lang);
+      return;
+    }
+
+    late final Uri uri;
     try {
-      final uri = Uri.parse(url);
-      if (await canLaunchUrl(uri)) {
-        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      var parsed = Uri.parse(s);
+      if (!parsed.hasScheme) {
+        parsed = Uri.parse('https://$s');
       }
-    } catch (_) {}
+      uri = parsed;
+    } catch (_) {
+      if (context.mounted) _showOpenLinkFailed(context, lang);
+      return;
+    }
+
+    if (!context.mounted) return;
+    try {
+      var launched = await launchUrl(
+        uri,
+        mode: LaunchMode.externalApplication,
+      );
+      if (!launched) {
+        launched = await launchUrl(uri, mode: LaunchMode.platformDefault);
+      }
+      if (!launched && context.mounted) {
+        _showOpenLinkFailed(context, lang);
+      }
+    } catch (_) {
+      if (context.mounted) _showOpenLinkFailed(context, lang);
+    }
+  }
+
+  Future<void> _showPickClassThenCreateLiveSession(
+    BuildContext context,
+    LanguageProvider lang,
+  ) async {
+    final auth = context.read<AuthProvider>();
+    final teacherId =
+        auth.user?.id == 'demo_teacher' ? 'teacher1' : auth.user?.id;
+    final repo = context.read<TeacherClassesRepository>();
+    final myClasses = await repo.getMyClasses(teacherId);
+    if (!context.mounted) return;
+    if (myClasses.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(lang.t('classes.noClassesFound'))),
+      );
+      return;
+    }
+    await showDialog<void>(
+      context: context,
+      useRootNavigator: true,
+      builder: (dialogCtx) => AlertDialog(
+        title: Text(lang.t('students.selectClass')),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: ListView.builder(
+            shrinkWrap: true,
+            itemCount: myClasses.length,
+            itemBuilder: (_, i) {
+              final c = myClasses[i];
+              final subtitle = '${c.subject} · ${c.level}';
+              final titleText = c.name.trim().isNotEmpty ? c.name : subtitle;
+              return ListTile(
+                title: Text(titleText),
+                subtitle: c.name.trim().isNotEmpty ? Text(subtitle) : null,
+                onTap: () async {
+                  Navigator.pop(dialogCtx);
+                  final full = await repo.getClassById(c.id);
+                  if (!context.mounted) return;
+                  if (full == null) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text(lang.t('classes.classNotFound'))),
+                    );
+                    return;
+                  }
+                  showTeacherCreateLiveSessionDialog(
+                    context,
+                    lang,
+                    full,
+                    onSuccess: () {
+                      if (!mounted) return;
+                      _reload();
+                    },
+                  );
+                },
+              );
+            },
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogCtx),
+            child: Text(lang.t('common.cancel')),
+          ),
+        ],
+      ),
+    );
   }
 
   void _confirmDelete(BuildContext context, LanguageProvider lang, String title) {
@@ -295,220 +576,4 @@ class _TeacherLiveSessionsScreenState extends State<TeacherLiveSessionsScreen> {
     );
   }
 
-  void _showCreateSessionDialog(BuildContext context, LanguageProvider lang) {
-    const labelColor = Color(0xFF374151);
-    const borderColor = Color(0xFFD1D5DB);
-
-    // Use translation with fallback so we never show raw keys (e.g. "live.createLiveSession")
-    String tr(String key, String fallback) {
-      final s = lang.t(key);
-      return (s == key || s.isEmpty) ? fallback : s;
-    }
-
-    String sessionTitle = '';
-    String grade = '';
-    String subject = '';
-    String className = '';
-    String date = '';
-    String time = '';
-    String meetingLink = '';
-
-    Widget requiredLabel(String text) {
-      return Text.rich(
-        TextSpan(
-          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: labelColor),
-          children: [TextSpan(text: '$text '), const TextSpan(text: '*', style: TextStyle(color: Colors.red, fontWeight: FontWeight.w600))],
-        ),
-      );
-    }
-
-    InputDecoration inputDecoration(String hint, {Widget? suffixIcon}) {
-      return InputDecoration(
-        hintText: hint,
-        hintStyle: TextStyle(color: Colors.grey.shade500, fontSize: 14),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: borderColor)),
-        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: borderColor)),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-        suffixIcon: suffixIcon,
-      );
-    }
-
-    const gradeOptions = ['4th', '5th', '6th', '7th'];
-    const subjectOptions = ['Math', 'Physics', 'Chemistry', 'SVT', 'French', 'Arabic', 'English', 'Modern Skills'];
-
-    showDialog(
-      context: context,
-      builder: (ctx) {
-        final screenWidth = MediaQuery.sizeOf(ctx).width;
-        final dialogWidth = (screenWidth > 420) ? 400.0 : (screenWidth - 24);
-        return StatefulBuilder(
-        builder: (ctx, setState) {
-          return Dialog(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            child: Container(
-              width: dialogWidth,
-              constraints: BoxConstraints(maxWidth: dialogWidth),
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 20),
-              child: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            tr('live.createLiveSession', 'Create Live Session'),
-                            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: AppTheme.primary),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                        IconButton(
-                          onPressed: () => Navigator.of(ctx).pop(),
-                          icon: const Icon(Icons.close, color: AppTheme.primary, size: 24),
-                          padding: EdgeInsets.zero,
-                          constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                    requiredLabel(tr('live.sessionTitle', 'Session Title')),
-                    const SizedBox(height: 4),
-                    TextField(
-                      decoration: inputDecoration(tr('live.sessionTitlePlaceholder', 'e.g., Mathematics Q&A Session')),
-                      onChanged: (v) => sessionTitle = v,
-                    ),
-                    const SizedBox(height: 12),
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              requiredLabel(tr('live.grade', 'Grade')),
-                              const SizedBox(height: 4),
-                              DropdownButtonFormField<String>(
-                                value: grade.isEmpty ? null : (gradeOptions.contains(grade) ? grade : null),
-                                decoration: InputDecoration(
-                                  hintText: tr('live.selectGrade', 'Select grade'),
-                                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: borderColor)),
-                                  enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: borderColor)),
-                                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                                ),
-                                isExpanded: true,
-                                items: gradeOptions.map((g) => DropdownMenuItem(value: g, child: Text('$g Grade', overflow: TextOverflow.ellipsis))).toList(),
-                                onChanged: (v) => setState(() => grade = v ?? ''),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              requiredLabel(tr('live.subject', 'Subject')),
-                              const SizedBox(height: 4),
-                              DropdownButtonFormField<String>(
-                                value: subject.isEmpty ? null : (subjectOptions.contains(subject) ? subject : null),
-                                decoration: InputDecoration(
-                                  hintText: tr('live.selectSubject', 'Select subject'),
-                                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: borderColor)),
-                                  enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: borderColor)),
-                                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                                ),
-                                isExpanded: true,
-                                items: subjectOptions.map((s) => DropdownMenuItem(value: s, child: Text(s, overflow: TextOverflow.ellipsis))).toList(),
-                                onChanged: (v) => setState(() => subject = v ?? ''),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    requiredLabel(tr('live.className', 'Class Name')),
-                    const SizedBox(height: 4),
-                    TextField(
-                      decoration: inputDecoration(tr('live.classPlaceholder', 'e.g., Grade 10 - Mathematics A')),
-                      onChanged: (v) => className = v,
-                    ),
-                    const SizedBox(height: 12),
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              requiredLabel(tr('live.date', 'Date')),
-                              const SizedBox(height: 4),
-                              TextField(
-                                decoration: inputDecoration(tr('live.datePlaceholder', 'dd / mm / yyyy'), suffixIcon: Icon(Icons.calendar_today, size: 20, color: Colors.grey.shade500)),
-                                onChanged: (v) => date = v,
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              requiredLabel(tr('live.time', 'Time')),
-                              const SizedBox(height: 4),
-                              TextField(
-                                decoration: inputDecoration(tr('live.timePlaceholder', '-- : -- --'), suffixIcon: Icon(Icons.schedule, size: 20, color: Colors.grey.shade500)),
-                                onChanged: (v) => time = v,
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    requiredLabel(tr('live.zoomMeetingLink', 'Zoom Meeting Link')),
-                    const SizedBox(height: 4),
-                    TextField(
-                      decoration: inputDecoration('https://zoom.us/j/...'),
-                      onChanged: (v) => meetingLink = v,
-                    ),
-                    const SizedBox(height: 20),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        OutlinedButton(
-                          onPressed: () => Navigator.of(ctx).pop(),
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: labelColor,
-                            side: const BorderSide(color: borderColor),
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                          ),
-                          child: Text(tr('common.cancel', 'Cancel')),
-                        ),
-                        const SizedBox(width: 8),
-                        Flexible(
-                          child: FilledButton(
-                            onPressed: () {
-                              Navigator.of(ctx).pop();
-                              final msg = 'Session created: $sessionTitle${className.isNotEmpty ? ' – $className' : ''}${grade.isNotEmpty || subject.isNotEmpty ? ' ($grade $subject)' : ''}. ${date.isNotEmpty ? '$date at $time. ' : ''}${meetingLink.isNotEmpty ? 'Link: $meetingLink' : ''}';
-                              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
-                            },
-                            style: FilledButton.styleFrom(backgroundColor: AppTheme.primary, foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10)),
-                            child: Text(tr('live.createSession', 'Create Session'), overflow: TextOverflow.ellipsis),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          );
-        },
-      );
-      },
-    );
-  }
 }

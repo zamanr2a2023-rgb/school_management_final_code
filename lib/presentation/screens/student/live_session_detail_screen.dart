@@ -57,8 +57,9 @@ class LiveSessionDetailScreen extends StatelessWidget {
         context.read<ClassesRepository>().getClasses(),
       ]),
       builder: (context, snapshot) {
-        if (!snapshot.hasData)
+        if (!snapshot.hasData) {
           return const Center(child: CircularProgressIndicator());
+        }
         final sessions = (snapshot.data![0] as List).cast<LiveSessionEntity>();
         final classes = (snapshot.data![1] as List).cast<ClassEntity>();
         LiveSessionEntity? session;

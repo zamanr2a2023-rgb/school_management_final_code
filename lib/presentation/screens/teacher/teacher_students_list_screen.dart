@@ -20,39 +20,58 @@ class _TeacherStudentsListScreenState extends State<TeacherStudentsListScreen> {
   Widget build(BuildContext context) {
     final lang = context.watch<LanguageProvider>();
     final repo = context.read<TeacherStudentsRepository>();
+    final queryTrimmed = _searchQuery.trim();
+    final hasSearch = queryTrimmed.isNotEmpty;
 
-    return FutureBuilder<TeacherStudentsListResult>(
-      key: ValueKey(_searchQuery),
-      future: repo.listStudents(_searchQuery),
-      builder: (context, snapshot) {
-        if (!snapshot.hasData) {
-          return const Material(color: Colors.transparent, child: Center(child: CircularProgressIndicator()));
-        }
-        final result = snapshot.data!;
+    return Material(
+      color: Colors.transparent,
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.only(bottom: 24),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildHeader(lang),
+            const SizedBox(height: 16),
+            _buildSearch(lang),
+            const SizedBox(height: 16),
+            FutureBuilder<TeacherStudentsListResult>(
+              key: ValueKey(queryTrimmed),
+              future: repo.listStudents(queryTrimmed),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting &&
+                    !snapshot.hasData) {
+                  return const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 48),
+                    child: Center(child: CircularProgressIndicator()),
+                  );
+                }
+                if (!snapshot.hasData) {
+                  return const SizedBox.shrink();
+                }
+                final result = snapshot.data!;
 
-        return Material(
-          color: Colors.transparent,
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.only(bottom: 24),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildHeader(lang),
-                const SizedBox(height: 16),
-                _buildSearch(lang),
-                const SizedBox(height: 16),
-                _buildStats(context, lang, result),
-                const SizedBox(height: 16),
-                _buildStudentsList(context, lang, result.students),
-                if (_searchQuery.isNotEmpty) ...[
-                  const SizedBox(height: 12),
-                  _buildResultsCount(context, lang, result.students.length, result.total),
-                ],
-              ],
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildStats(context, lang, result),
+                    const SizedBox(height: 16),
+                    _buildStudentsList(context, lang, result.students),
+                    if (hasSearch) ...[
+                      const SizedBox(height: 12),
+                      _buildResultsCount(
+                        context,
+                        lang,
+                        result.students.length,
+                        result.total,
+                      ),
+                    ],
+                  ],
+                );
+              },
             ),
-          ),
-        );
-      },
+          ],
+        ),
+      ),
     );
   }
 
@@ -100,7 +119,9 @@ class _TeacherStudentsListScreenState extends State<TeacherStudentsListScreen> {
   }
 
   Widget _buildStats(BuildContext context, LanguageProvider lang, TeacherStudentsListResult result) {
-    final avgGrade = result.students.isEmpty ? 0 : result.averageGradePercent.round().clamp(0, 100);
+    final avgGrade = result.teacherAverageScorePercent != null
+        ? result.teacherAverageScorePercent!.round().clamp(0, 100)
+        : (result.students.isEmpty ? 0 : result.averageGradePercent.round().clamp(0, 100));
 
     return Row(
       children: [
@@ -156,7 +177,9 @@ class _TeacherStudentsListScreenState extends State<TeacherStudentsListScreen> {
               Icon(Icons.people_outline, size: 48, color: Colors.grey.shade400),
               const SizedBox(height: 12),
               Text(
-                _searchQuery.isNotEmpty ? lang.t('students.noStudentsFound') : lang.t('students.noStudentsEnrolled'),
+                _searchQuery.trim().isNotEmpty
+                    ? lang.t('students.noStudentsFound')
+                    : lang.t('students.noStudentsEnrolled'),
                 style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
                 textAlign: TextAlign.center,
               ),

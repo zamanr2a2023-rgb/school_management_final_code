@@ -28,6 +28,15 @@ class AuthRepositoryImpl implements AuthRepository {
   Future<void> verifyOtp(String phone, String otp) async {
     if (!_remote.isConfigured) return;
     await _remote.verifyOtp(phone: phone, otp: otp);
+    final token = _prefs.getString(AppConstants.sessionTokenKey);
+    if (token == null || token.isEmpty) return;
+    try {
+      final map = await _remote.getUsersMe(token);
+      if (map == null) return;
+      final normalized = _normalizeUserMapForSession(map);
+      await _saveApiSession(token, normalized);
+      _currentUser = _userFromMap(normalized);
+    } catch (_) {}
   }
 
   @override
@@ -38,6 +47,10 @@ class AuthRepositoryImpl implements AuthRepository {
     if (token != null && token.isNotEmpty && userJson != null && userJson.isNotEmpty) {
       try {
         final map = jsonDecode(userJson) as Map<String, dynamic>;
+        if (!_isPhoneVerifiedInUserMap(map)) {
+          await logout();
+          return;
+        }
         final user = _userFromMap(map);
         if (user != null) {
           _currentUser = user;
@@ -64,6 +77,7 @@ class AuthRepositoryImpl implements AuthRepository {
     for (final u in list) {
       if (u['id'] == id) {
         if (u['role'] == 'teacher' && u['status'] == 'pending') return;
+        final phoneStr = u['phone']?.toString();
         _currentUser = UserEntity(
           id: u['id'] as String,
           name: u['name'] as String,
@@ -71,11 +85,21 @@ class AuthRepositoryImpl implements AuthRepository {
           role: u['role'] == 'teacher' ? UserRole.teacher : UserRole.student,
           grade: u['grade'] as String?,
           subject: u['subject'] as String?,
+          phone: phoneStr != null && phoneStr.isNotEmpty ? phoneStr : null,
         );
         await _prefs.setString(AppConstants.sessionRoleKey, _currentUser!.role == UserRole.teacher ? 'teacher' : 'student');
         return;
       }
     }
+  }
+
+  /// `phoneVerified: false` from API means OTP not completed — treat as unverified.
+  /// Missing key: legacy session → treat as verified.
+  static bool _isPhoneVerifiedInUserMap(Map<String, dynamic> m) {
+    final v = m['phoneVerified'];
+    if (v == null) return true;
+    if (v is bool) return v;
+    return v.toString().toLowerCase() == 'true';
   }
 
   static UserEntity? _userFromMap(Map<String, dynamic> m) {
@@ -87,6 +111,8 @@ class AuthRepositoryImpl implements AuthRepository {
     final email = m['email']?.toString() ?? '${m['phone'] ?? id}@school.mr';
     final grade = m['grade']?.toString();
     final subject = m['subject']?.toString();
+    final phone = m['phone']?.toString();
+    final phoneVerified = _isPhoneVerifiedInUserMap(m);
     return UserEntity(
       id: id,
       name: name,
@@ -94,6 +120,8 @@ class AuthRepositoryImpl implements AuthRepository {
       role: role,
       grade: grade,
       subject: subject,
+      phone: phone != null && phone.isNotEmpty ? phone : null,
+      phoneVerified: phoneVerified,
     );
   }
 
@@ -126,8 +154,12 @@ class AuthRepositoryImpl implements AuthRepository {
     if (_remote.isConfigured) {
       try {
         final res = await _remote.login(emailOrPhone, password);
-        await _saveApiSession(res.token, res.user);
-        _currentUser = _userFromMap(res.user);
+        final userMap = Map<String, dynamic>.from(res.user);
+        if ((userMap['phone']?.toString().trim() ?? '').isEmpty) {
+          userMap['phone'] = emailOrPhone.trim();
+        }
+        await _saveApiSession(res.token, userMap);
+        _currentUser = _userFromMap(userMap);
         return _currentUser != null;
       } on AuthApiException {
         rethrow;
@@ -151,6 +183,7 @@ class AuthRepositoryImpl implements AuthRepository {
     for (final u in list) {
       if ((u['phone'] == emailOrPhone || u['email'] == emailOrPhone) && u['password'] == password) {
         if (u['role'] == 'teacher' && u['status'] == 'pending') return false;
+        final phoneStr = u['phone']?.toString();
         _currentUser = UserEntity(
           id: u['id'] as String,
           name: u['name'] as String,
@@ -158,6 +191,7 @@ class AuthRepositoryImpl implements AuthRepository {
           role: u['role'] == 'teacher' ? UserRole.teacher : UserRole.student,
           grade: u['grade'] as String?,
           subject: u['subject'] as String?,
+          phone: phoneStr != null && phoneStr.isNotEmpty ? phoneStr : null,
         );
         await _prefs.setString(AppConstants.sessionUserIdKey, _currentUser!.id);
         await _prefs.setString(AppConstants.sessionRoleKey, _currentUser!.role == UserRole.teacher ? 'teacher' : 'student');
@@ -213,14 +247,13 @@ class AuthRepositoryImpl implements AuthRepository {
                 assignedGradeIds: assignedGradeIds,
                 assignedGrades: assignedGrades,
               );
-        await _saveApiSession(res.token, res.user);
-        final user = _userFromMap(res.user);
-        // Teacher pending: API may return status pending; don't auto-login
-        final status = res.user['status']?.toString();
-        if (role == 'teacher' && status == 'pending') {
-          await logout();
-          return true;
+        final userMap = Map<String, dynamic>.from(res.user);
+        final existingPhone = userMap['phone']?.toString().trim() ?? '';
+        if (existingPhone.isEmpty) {
+          userMap['phone'] = phone;
         }
+        await _saveApiSession(res.token, userMap);
+        final user = _userFromMap(userMap);
         _currentUser = user;
         return true;
       } on AuthApiException {
@@ -252,6 +285,7 @@ class AuthRepositoryImpl implements AuthRepository {
         email: newUser['email'] as String,
         role: UserRole.student,
         grade: grade,
+        phone: phone,
       );
     }
     return true;
@@ -310,6 +344,8 @@ class AuthRepositoryImpl implements AuthRepository {
       grade: _currentUser!.grade,
       subject: _currentUser!.subject,
       enrolledClassIds: _currentUser!.enrolledClassIds,
+      phone: phone,
+      phoneVerified: _currentUser!.phoneVerified,
     );
   }
 }

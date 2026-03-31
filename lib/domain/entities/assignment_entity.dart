@@ -1,5 +1,20 @@
 enum AssignmentStatus { pending, submitted, graded }
 
+/// Teacher assignment attachment from API (`attachments[]`).
+class AssignmentAttachmentEntity {
+  const AssignmentAttachmentEntity({
+    required this.originalName,
+    this.mimeType,
+    this.size,
+    this.url,
+  });
+
+  final String originalName;
+  final String? mimeType;
+  final int? size;
+  final String? url;
+}
+
 class AssignmentEntity {
   final String id;
   final String classId;
@@ -11,6 +26,9 @@ class AssignmentEntity {
   final int? grade;
   final String? feedback;
   final List<SubmissionEntity>? submissions;
+  final String? subjectName;
+  final String? gradeLabel;
+  final List<AssignmentAttachmentEntity>? attachments;
 
   const AssignmentEntity({
     required this.id,
@@ -23,6 +41,9 @@ class AssignmentEntity {
     this.grade,
     this.feedback,
     this.submissions,
+    this.subjectName,
+    this.gradeLabel,
+    this.attachments,
   });
 }
 
