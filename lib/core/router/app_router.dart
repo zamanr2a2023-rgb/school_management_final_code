@@ -75,7 +75,9 @@ class AppRouter {
             !isLogin &&
             !isRegister &&
             !loc.startsWith('/sitemap') &&
-            !loc.startsWith('/otp/')) return '/login';
+            !loc.startsWith('/otp/')) {
+          return '/login';
+        }
         // Logged in but phone not verified (e.g. closed app before OTP) — force OTP, not home/login bypass.
         if (isAuthenticated &&
             user != null &&
@@ -95,10 +97,12 @@ class AppRouter {
           return '/login';
         }
         if (isAuthenticated && user != null) {
-          if (loc.startsWith('/student/') && user.role != UserRole.student)
+          if (loc.startsWith('/student/') && user.role != UserRole.student) {
             return '/teacher/dashboard';
-          if (loc.startsWith('/teacher/') && user.role != UserRole.teacher)
+          }
+          if (loc.startsWith('/teacher/') && user.role != UserRole.teacher) {
             return '/student/dashboard';
+          }
         }
         return null;
       },

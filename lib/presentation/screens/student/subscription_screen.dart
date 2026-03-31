@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:high_school/presentation/providers/auth_provider.dart';
-import 'package:high_school/presentation/providers/language_provider.dart';
 import 'package:high_school/presentation/providers/subscription_provider.dart';
 
 class SubscriptionScreen extends StatelessWidget {

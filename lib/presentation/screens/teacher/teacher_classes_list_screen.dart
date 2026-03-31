@@ -32,8 +32,9 @@ class _TeacherClassesListScreenState extends State<TeacherClassesListScreen> {
     return FutureBuilder<List<ClassEntity>>(
       future: context.read<TeacherClassesRepository>().getMyClasses(teacherId),
       builder: (context, snapshot) {
-        if (!snapshot.hasData)
+        if (!snapshot.hasData) {
           return const Center(child: CircularProgressIndicator());
+        }
         final myClasses = snapshot.data!;
         final grades = myClasses.map((c) => c.level).toSet().toList()..sort();
         final filteredClasses = _gradeFilter == 'all'
@@ -170,7 +171,7 @@ class _TeacherClassesListScreenState extends State<TeacherClassesListScreen> {
             ),
             const SizedBox(height: 8),
             DropdownButtonFormField<String>(
-              value: _gradeFilter,
+              initialValue: _gradeFilter,
               decoration: InputDecoration(
                 contentPadding:
                     const EdgeInsets.symmetric(horizontal: 12, vertical: 10),

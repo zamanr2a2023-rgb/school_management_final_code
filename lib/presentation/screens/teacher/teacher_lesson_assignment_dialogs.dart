@@ -355,9 +355,8 @@ void showTeacherCreateLessonDialog(
                         ],
                       ),
                       const SizedBox(height: 12),
-                      dialogLabel(_tr(lang, 'teacherClassDetails.lessonTitle',
-                              'Lesson Title') +
-                          ' *'),
+                      dialogLabel('${_tr(lang, 'teacherClassDetails.lessonTitle',
+                              'Lesson Title')} *'),
                       TextField(
                           decoration:
                               inputDecoration('e.g., Introduction to Algebra'),
@@ -373,11 +372,10 @@ void showTeacherCreateLessonDialog(
                           onChanged: (v) => description = v,
                           controller: TextEditingController(text: description)),
                       const SizedBox(height: 12),
-                      dialogLabel(_tr(lang, 'teacherClassDetails.contentType',
-                              'Content Type') +
-                          ' *'),
+                      dialogLabel('${_tr(lang, 'teacherClassDetails.contentType',
+                              'Content Type')} *'),
                       DropdownButtonFormField<String>(
-                        value: type,
+                        initialValue: type,
                         decoration: inputDecoration('').copyWith(
                             contentPadding: const EdgeInsets.symmetric(
                                 horizontal: 12, vertical: 10)),
@@ -391,8 +389,7 @@ void showTeacherCreateLessonDialog(
                       ),
                       const SizedBox(height: 12),
                       dialogLabel(
-                          _tr(lang, 'teacherClassDetails.chapter', 'Chapter') +
-                              ' *'),
+                          '${_tr(lang, 'teacherClassDetails.chapter', 'Chapter')} *'),
                       TextField(
                           decoration:
                               inputDecoration('e.g., Chapter 3: Equations'),
@@ -456,10 +453,9 @@ void showTeacherCreateLessonDialog(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     dialogLabel(
-                                        _tr(lang, 'live.grade', 'Grade') +
-                                            ' *'),
+                                        '${_tr(lang, 'live.grade', 'Grade')} *'),
                                     DropdownButtonFormField<String>(
-                                      value: grade.isEmpty
+                                      initialValue: grade.isEmpty
                                           ? null
                                           : (gradeOptions.contains(grade)
                                               ? grade
@@ -488,10 +484,9 @@ void showTeacherCreateLessonDialog(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     dialogLabel(
-                                        _tr(lang, 'live.subject', 'Subject') +
-                                            ' *'),
+                                        '${_tr(lang, 'live.subject', 'Subject')} *'),
                                     DropdownButtonFormField<String>(
-                                      value: subject,
+                                      initialValue: subject,
                                       decoration: inputDecoration('').copyWith(
                                           contentPadding:
                                               const EdgeInsets.symmetric(
@@ -511,7 +506,7 @@ void showTeacherCreateLessonDialog(
                         ),
                       ],
                       const SizedBox(height: 12),
-                      dialogLabel(_tr(lang, 'live.date', 'Date') + ' *'),
+                      dialogLabel('${_tr(lang, 'live.date', 'Date')} *'),
                       InkWell(
                         onTap: () async {
                           final picked = await showDatePicker(

@@ -1,7 +1,11 @@
 class AppConstants {
   AppConstants._();
 
-  static const String appName = 'Nouadhibou HS';
+  /// Launcher / UI display name
+  static const String appName = 'Garini';
+
+  /// Brand logo (declared in pubspec.yaml)
+  static const String logoAsset = 'assets/Logo.jpg';
   static const String languageSelectedKey = 'languageSelected';
   static const String languageKey = 'language';
   static const String registeredUsersKey = 'registeredUsers';

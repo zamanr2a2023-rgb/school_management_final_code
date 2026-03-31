@@ -46,8 +46,9 @@ class TeacherDashboardScreen extends StatelessWidget {
     return FutureBuilder<_TeacherDashboardData>(
       future: _loadDashboard(context, teacherId, today),
       builder: (context, snapshot) {
-        if (!snapshot.hasData)
+        if (!snapshot.hasData) {
           return const Center(child: CircularProgressIndicator());
+        }
         final data = snapshot.data!;
         final firstName = auth.user?.name.split(' ').first ?? '';
 

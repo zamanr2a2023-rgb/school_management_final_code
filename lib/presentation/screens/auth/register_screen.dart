@@ -98,7 +98,7 @@ class _RegisterBodyState extends State<_RegisterBody> {
         }
         final subjects = snapshot.data!;
         return DropdownButtonFormField<String>(
-          value: _teacherSubjectId,
+          initialValue: _teacherSubjectId,
           decoration: const InputDecoration(
             border: OutlineInputBorder(),
             contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
@@ -261,7 +261,7 @@ class _RegisterBodyState extends State<_RegisterBody> {
                 Text(lang.t('classes.grade'), style: Theme.of(context).textTheme.labelMedium),
                 const SizedBox(height: 4),
                 DropdownButtonFormField<String>(
-                  value: _grade.isNotEmpty && ['4th', '5th', '6th', '7th'].contains(_grade) ? _grade : null,
+                  initialValue: _grade.isNotEmpty && ['4th', '5th', '6th', '7th'].contains(_grade) ? _grade : null,
                   decoration: const InputDecoration(
                     border: OutlineInputBorder(),
                     contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
@@ -336,7 +336,7 @@ class _RegisterBodyState extends State<_RegisterBody> {
               ),
               TextButton(
                 onPressed: () => context.go('/login'),
-                child: Text(lang.t('auth.noAccount') + ' ' + lang.t('auth.login')),
+                child: Text('${lang.t('auth.noAccount')} ${lang.t('auth.login')}'),
               ),
             ],
           ),

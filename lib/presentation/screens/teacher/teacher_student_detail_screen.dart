@@ -600,7 +600,7 @@ class _TeacherStudentDetailScreenState extends State<TeacherStudentDetailScreen>
                   Text('Status', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
                   const SizedBox(height: 4),
                   DropdownButtonFormField<String>(
-                    value: _attendanceStatus,
+                    initialValue: _attendanceStatus,
                     items: [
                       DropdownMenuItem(value: 'present', child: Text(lang.t('students.present'))),
                       DropdownMenuItem(value: 'absent', child: Text(lang.t('students.absent'))),
