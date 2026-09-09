@@ -210,10 +210,10 @@ class _TeacherClassDetailsScreenState extends State<TeacherClassDetailsScreen> {
   Widget _buildTabs(BuildContext context, LanguageProvider lang) {
     final tabs = [
       (Icons.menu_book, tr(lang, 'lessons.lessons', 'Lessons')),
-      (Icons.assignment, 'Assignments'),
+      (Icons.assignment, tr(lang, 'assignments.assignments', 'Assignments')),
       (Icons.people, tr(lang, 'classes.students', 'Students')),
-      (Icons.video_call, 'Live'),
-      (Icons.bar_chart, 'Analytics'),
+      (Icons.video_call, tr(lang, 'teacherClassDetails.tabLive', 'Live')),
+      (Icons.bar_chart, tr(lang, 'analytics.analytics', 'Analytics')),
     ];
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
@@ -365,7 +365,11 @@ class _TeacherClassDetailsScreenState extends State<TeacherClassDetailsScreen> {
   }
 
   Widget _lessonCard(BuildContext context, LanguageProvider lang, ClassEntity cls, LessonEntity lesson) {
-    final typeStr = lesson.type == LessonType.video ? 'Video' : (lesson.type == LessonType.pdf ? 'PDF' : 'Text');
+    final typeStr = lesson.type == LessonType.video
+        ? tr(lang, 'lessons.video', 'Video')
+        : (lesson.type == LessonType.pdf
+            ? tr(lang, 'lessons.pdf', 'PDF')
+            : tr(lang, 'lessons.text', 'Text'));
     final content = lesson.content.trim();
     final isUrl = content.startsWith('http://') || content.startsWith('https://');
     final fileName = lesson.attachmentName?.trim().isNotEmpty == true
@@ -1136,11 +1140,26 @@ class _TeacherClassDetailsScreenState extends State<TeacherClassDetailsScreen> {
     final attendanceRate = api != null ? api.avgAttendance.round() : 95;
     const completionRate = 92;
     final totalStudents = api != null ? api.totalStudents : cls.students;
-    final thirdLabel = api != null ? 'Lessons' : 'Completion';
+    final thirdLabel = api != null
+        ? tr(lang, 'lessons.lessons', 'Lessons')
+        : tr(lang, 'teacherClassDetails.completion', 'Completion');
     final thirdValue = api != null ? '${api.totalLessons}' : '$completionRate%';
-    final thirdSubtitle = api != null ? 'Published in class' : '+5% from last month';
-    final gradeSubtitle = api != null ? 'Class average' : '+3% from last month';
-    final attendSubtitle = api != null ? 'Class average' : '+2% from last month';
+    final thirdSubtitle = api != null
+        ? tr(lang, 'teacherClassDetails.publishedInClass', 'Published in class')
+        : tr(lang, 'teacherClassDetails.fromLastMonth', '+5% from last month');
+    final gradeSubtitle = api != null
+        ? tr(lang, 'teacherClassDetails.classAverage', 'Class average')
+        : tr(lang, 'teacherClassDetails.fromLastMonth', '+3% from last month');
+    final attendSubtitle = api != null
+        ? tr(lang, 'teacherClassDetails.classAverage', 'Class average')
+        : tr(lang, 'teacherClassDetails.fromLastMonth', '+2% from last month');
+    final insightKey = avgGrade >= 85
+        ? 'teacherClassDetails.performanceInsightExcellent'
+        : 'teacherClassDetails.performanceInsightWell';
+    final insightFallback = avgGrade >= 85
+        ? 'Your class is performing excellently with an average grade of $avgGrade%. Keep up the great work!'
+        : 'Your class is performing well with an average grade of $avgGrade%. Keep up the great work!';
+    final insightText = tr(lang, insightKey, insightFallback).replaceAll('{avg}', '$avgGrade');
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1153,10 +1172,18 @@ class _TeacherClassDetailsScreenState extends State<TeacherClassDetailsScreen> {
           crossAxisSpacing: 12,
           childAspectRatio: 1.1,
           children: [
-            _statCard('Avg. Grade', '$avgGrade%', Icons.trending_up, AppTheme.secondary, gradeSubtitle),
-            _statCard('Attendance', '$attendanceRate%', Icons.people, AppTheme.primary, attendSubtitle),
+            _statCard(tr(lang, 'students.avgGrade', 'Avg. Grade'), '$avgGrade%', Icons.trending_up, AppTheme.secondary, gradeSubtitle),
+            _statCard(tr(lang, 'profile.attendance', 'Attendance'), '$attendanceRate%', Icons.people, AppTheme.primary, attendSubtitle),
             _statCard(thirdLabel, thirdValue, Icons.menu_book, AppTheme.accent, thirdSubtitle),
-            _statCard('Students', '$totalStudents', Icons.emoji_events, AppTheme.primary, api != null ? 'From analytics' : 'Enrolled this semester'),
+            _statCard(
+              tr(lang, 'classes.students', 'Students'),
+              '$totalStudents',
+              Icons.emoji_events,
+              AppTheme.primary,
+              api != null
+                  ? tr(lang, 'teacherClassDetails.fromAnalytics', 'From analytics')
+                  : tr(lang, 'teacherClassDetails.enrolledThisSemester', 'Enrolled this semester'),
+            ),
           ],
         ),
         const SizedBox(height: 16),
@@ -1171,7 +1198,7 @@ class _TeacherClassDetailsScreenState extends State<TeacherClassDetailsScreen> {
                 const SizedBox(height: 12),
                 _overviewRow(Icons.menu_book, tr(lang, 'lessons.lessons', 'Lessons'), lessons.length),
                 _overviewRow(Icons.assignment, tr(lang, 'assignments.assignments', 'Assignments'), assignments.length),
-                _overviewRow(Icons.video_call, 'Live Sessions', liveSessions.length),
+                _overviewRow(Icons.video_call, tr(lang, 'live.liveSessions', 'Live Sessions'), liveSessions.length),
               ],
             ),
           ),
@@ -1194,7 +1221,7 @@ class _TeacherClassDetailsScreenState extends State<TeacherClassDetailsScreen> {
                       Text(tr(lang, 'teacherClassDetails.performanceInsight', 'Performance Insight'), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
                       const SizedBox(height: 4),
                       Text(
-                        'Your class is performing ${avgGrade >= 85 ? 'excellently' : 'well'} with an average grade of $avgGrade%. Keep up the great work!',
+                        insightText,
                         style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
                       ),
                     ],

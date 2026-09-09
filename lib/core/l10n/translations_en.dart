@@ -234,6 +234,18 @@ const Map<String, dynamic> translationsEn = {
     'attachPdfOnly': 'Click to upload PDF',
     'saveAsDraft': 'Save as Draft',
     'deleteAssignment': 'Delete Assignment',
+    'tabLive': 'Live',
+    'avgGrade': 'Avg. Grade',
+    'classAverage': 'Class average',
+    'publishedInClass': 'Published in class',
+    'fromAnalytics': 'From analytics',
+    'enrolledThisSemester': 'Enrolled this semester',
+    'completion': 'Completion',
+    'fromLastMonth': 'from last month',
+    'performanceInsightExcellent':
+        'Your class is performing excellently with an average grade of {avg}%. Keep up the great work!',
+    'performanceInsightWell':
+        'Your class is performing well with an average grade of {avg}%. Keep up the great work!',
   },
   'lessons': {
     'lessons': 'Lessons',
@@ -246,6 +258,9 @@ const Map<String, dynamic> translationsEn = {
     'videoLesson': 'Video Lesson',
     'textContent': 'Text Content',
     'pdfDocument': 'PDF Document',
+    'video': 'Video',
+    'pdf': 'PDF',
+    'text': 'Text',
     'watchVideo': 'Watch Video',
     'downloadPDF': 'Download PDF',
     'markComplete': 'Mark as Complete',

@@ -16,9 +16,9 @@ class AppConstants {
   static const String sessionUserJsonKey = 'sessionUserJson';
 
   /// Base URL for API (e.g. https://your-api.com). Empty = use mock auth only.
-  static const String apiBaseUrl = 'http://16.171.129.200';
-    // static const String apiBaseUrl = 'http://103.208.183.250:5005';
-
+  // static const String apiBaseUrl = 'https://16.171.129.200';
+    static const String apiBaseUrl = 'https://rimversion.com';
+  // static const String apiBaseUrl = 'http://103.208.183.250:5005';
   // Demo accounts
   static const String demoStudentPhone = '12345678';
   static const String demoStudentPin = '1234';
