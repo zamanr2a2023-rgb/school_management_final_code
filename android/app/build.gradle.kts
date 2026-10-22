@@ -73,6 +73,11 @@ flutter {
     source = "../.."
 }
 
+// Apply Google Services only when Firebase config is present (optional FCM).
+if (file("google-services.json").exists()) {
+    apply(plugin = "com.google.gms.google-services")
+}
+
 // Fail Play-bound release builds if signing is not configured (avoids debug-signed AAB uploads).
 afterEvaluate {
     listOf("bundleRelease", "assembleRelease").forEach { taskName ->

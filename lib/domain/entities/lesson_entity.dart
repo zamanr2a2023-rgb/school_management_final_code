@@ -17,6 +17,9 @@ class LessonEntity {
   final String? attachmentMimeType;
   final String? attachmentName;
 
+  /// True when the lesson was uploaded by an admin (shared grade/subject content).
+  final bool uploadedByAdmin;
+
   const LessonEntity({
     required this.id,
     required this.classId,
@@ -31,5 +34,6 @@ class LessonEntity {
     this.module,
     this.attachmentMimeType,
     this.attachmentName,
+    this.uploadedByAdmin = false,
   });
 }

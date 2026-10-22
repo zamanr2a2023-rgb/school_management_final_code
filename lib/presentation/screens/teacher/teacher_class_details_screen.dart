@@ -163,10 +163,35 @@ class _TeacherClassDetailsScreenState extends State<TeacherClassDetailsScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          TextButton.icon(
-            onPressed: () => context.go('/teacher/classes'),
-            icon: const Icon(Icons.arrow_back, size: 18, color: Colors.white),
-            label: Text(tr(lang, 'classes.backToClasses', 'Back to Classes'), style: const TextStyle(color: Colors.white, fontSize: 14)),
+          Row(
+            children: [
+              TextButton.icon(
+                onPressed: () => context.go('/teacher/classes'),
+                style: TextButton.styleFrom(
+                  padding: EdgeInsets.zero,
+                  minimumSize: Size.zero,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  alignment: Alignment.centerLeft,
+                ),
+                icon: const Icon(Icons.arrow_back, size: 18, color: Colors.white),
+                label: Text(tr(lang, 'classes.backToClasses', 'Back to Classes'), style: const TextStyle(color: Colors.white, fontSize: 14)),
+              ),
+              const Spacer(),
+              Container(
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.22),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: IconButton(
+                  tooltip: tr(lang, 'chat.title', 'Class Chat'),
+                  onPressed: () => context.push(
+                    '/teacher/classes/${cls.id}/chat',
+                    extra: cls.name,
+                  ),
+                  icon: const Icon(Icons.chat_bubble_outline, color: Colors.white),
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: 8),
           Text(cls.name, style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
@@ -425,6 +450,14 @@ class _TeacherClassDetailsScreenState extends State<TeacherClassDetailsScreen> {
                   border: lesson.status == LessonStatus.published ? const Color(0xFFA5D6A7) : const Color(0xFFB0BEC5),
                   icon: lesson.status == LessonStatus.published ? Icons.visibility_outlined : Icons.visibility_off_outlined,
                 ),
+                if (lesson.uploadedByAdmin)
+                  _lessonOutlineChip(
+                    label: tr(lang, 'teacherClassDetails.admin', 'Admin'),
+                    fg: const Color(0xFF1565C0),
+                    bg: const Color(0xFFE3F2FD),
+                    border: const Color(0xFF90CAF9),
+                    icon: Icons.admin_panel_settings_outlined,
+                  ),
                 _lessonOutlineChip(
                   label: typeStr,
                   fg: const Color(0xFF37474F),

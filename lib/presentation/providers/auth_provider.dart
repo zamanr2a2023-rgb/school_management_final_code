@@ -59,8 +59,14 @@ class AuthProvider with ChangeNotifier {
     }
   }
 
+  /// Optional hook (e.g. clear FCM token) before clearing the session.
+  Future<void> Function()? beforeLogout;
+
   Future<void> logout() async {
     lastAuthError = null;
+    try {
+      await beforeLogout?.call();
+    } catch (_) {}
     await _authRepository.logout();
     notifyListeners();
   }

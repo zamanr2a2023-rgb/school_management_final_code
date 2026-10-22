@@ -14,6 +14,7 @@ import 'package:high_school/presentation/screens/auth/otp_verify_screen.dart';
 import 'package:high_school/presentation/screens/student/student_dashboard_screen.dart';
 import 'package:high_school/presentation/screens/student/classes_list_screen.dart';
 import 'package:high_school/presentation/screens/student/class_details_screen.dart';
+import 'package:high_school/presentation/screens/class_chat_screen.dart';
 import 'package:high_school/presentation/screens/student/lesson_details_screen.dart';
 import 'package:high_school/presentation/screens/student/assignments_list_screen.dart';
 import 'package:high_school/presentation/screens/student/assignment_details_screen.dart';
@@ -145,6 +146,21 @@ class AppRouter {
           ),
         ),
         GoRoute(
+          path: '/student/classes/:classId/chat',
+          builder: (_, state) {
+            final classId = state.pathParameters['classId']!;
+            final extra = state.extra;
+            final className = extra is String
+                ? extra
+                : (extra is ClassEntity ? extra.name : null);
+            return ClassChatScreen(
+              classId: classId,
+              className: className,
+              backPath: '/student/classes/$classId',
+            );
+          },
+        ),
+        GoRoute(
           path: '/student/lessons/:lessonId',
           builder: (_, state) => LayoutWidget(
             child: LessonDetailsScreen(
@@ -219,6 +235,21 @@ class AppRouter {
             child: TeacherClassDetailsScreen(
                 classId: state.pathParameters['classId']!),
           ),
+        ),
+        GoRoute(
+          path: '/teacher/classes/:classId/chat',
+          builder: (_, state) {
+            final classId = state.pathParameters['classId']!;
+            final extra = state.extra;
+            final className = extra is String
+                ? extra
+                : (extra is ClassEntity ? extra.name : null);
+            return ClassChatScreen(
+              classId: classId,
+              className: className,
+              backPath: '/teacher/classes/$classId',
+            );
+          },
         ),
         GoRoute(
           path: '/teacher/assignments/:assignmentId',

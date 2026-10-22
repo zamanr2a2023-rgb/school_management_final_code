@@ -26,8 +26,15 @@ import 'package:high_school/domain/repositories/teacher_dashboard_repository.dar
 import 'package:high_school/domain/repositories/teacher_classes_repository.dart';
 import 'package:high_school/domain/repositories/teacher_profile_repository.dart';
 import 'package:high_school/domain/repositories/teacher_students_repository.dart';
+import 'package:high_school/domain/repositories/class_chat_repository.dart';
 import 'package:high_school/data/repositories/auth_repository_impl.dart';
+import 'package:high_school/data/repositories/class_chat_repository_impl.dart';
+import 'package:high_school/data/datasources/class_chat_remote_datasource.dart';
+import 'package:high_school/data/datasources/class_chat_socket_client.dart';
+import 'package:high_school/core/services/push_notification_service.dart';
+import 'package:high_school/domain/entities/user_entity.dart';
 import 'package:high_school/data/repositories/classes_repository_impl.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:high_school/data/repositories/lessons_repository_impl.dart';
 import 'package:high_school/data/repositories/assignments_repository_impl.dart';
 import 'package:high_school/data/repositories/students_repository_impl.dart';
@@ -56,6 +63,11 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await initializeDateFormatting(AppDateFormat.locale);
   final prefs = await SharedPreferences.getInstance();
+
+  // Background FCM handler (no-op if Firebase not configured)
+  try {
+    FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
+  } catch (_) {}
 
   // Repositories
   final AuthRepository authRepo = AuthRepositoryImpl(prefs);
@@ -96,15 +108,45 @@ void main() async {
       AssignmentsRemoteDatasource(prefs);
   final StudentLessonRemoteDatasource studentLessonRemoteDatasource =
       StudentLessonRemoteDatasource(prefs);
+  final ClassChatRemoteDatasource classChatRemoteDatasource =
+      ClassChatRemoteDatasource(prefs);
+  final ClassChatSocketClient classChatSocketClient =
+      ClassChatSocketClient(prefs);
+  final ClassChatRepository classChatRepo =
+      ClassChatRepositoryImpl(classChatRemoteDatasource, classChatSocketClient);
+
+  final pushService =
+      PushNotificationService(prefs, classChatRemoteDatasource);
 
   // Providers
   final authProvider = AuthProvider(authRepo);
+  authProvider.beforeLogout = () => pushService.clearTokenOnLogout();
   await authProvider.restoreSession();
 
   final languageProvider = LanguageProvider(prefs);
   final subscriptionProvider = SubscriptionProvider(subscriptionRepo);
 
   final router = await AppRouter.createRouter();
+
+  pushService.onOpenClassChat = (classId) {
+    final role = authProvider.user?.role;
+    if (role == UserRole.teacher) {
+      router.go('/teacher/classes/$classId/chat');
+    } else {
+      router.go('/student/classes/$classId/chat');
+    }
+  };
+
+  await pushService.init();
+  if (authProvider.isAuthenticated) {
+    await pushService.syncTokenWithBackend();
+  }
+
+  authProvider.addListener(() {
+    if (authProvider.isAuthenticated) {
+      pushService.syncTokenWithBackend();
+    }
+  });
 
   UnauthorizedHandler.onUnauthorized = () async {
     await authProvider.logout();
@@ -141,6 +183,8 @@ void main() async {
             value: assignmentsRemoteDatasource),
         Provider<StudentLessonRemoteDatasource>.value(
             value: studentLessonRemoteDatasource),
+        Provider<ClassChatRepository>.value(value: classChatRepo),
+        Provider<PushNotificationService>.value(value: pushService),
       ],
       child: Consumer<LanguageProvider>(
         builder: (context, languageProvider, _) {

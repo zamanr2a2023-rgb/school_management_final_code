@@ -256,6 +256,12 @@ class TeacherClassesRemoteDatasource {
     if (lastUpdated.length >= 10) lastUpdated = lastUpdated.substring(0, 10);
     if (lastUpdated.isEmpty) lastUpdated = dateStr;
     final module = m['chapter']?.toString() ?? m['module']?.toString();
+    final createdByRole = (m['createdBy'] is Map
+            ? (m['createdBy'] as Map)['role']
+            : m['createdByRole'])
+        ?.toString()
+        .toLowerCase();
+    final uploadedByAdmin = m['uploadedByAdmin'] == true || createdByRole == 'admin';
     return LessonEntity(
       id: id,
       classId: classId,
@@ -270,6 +276,7 @@ class TeacherClassesRemoteDatasource {
       module: module,
       attachmentMimeType: attachmentMime,
       attachmentName: attachmentName,
+      uploadedByAdmin: uploadedByAdmin,
     );
   }
 
