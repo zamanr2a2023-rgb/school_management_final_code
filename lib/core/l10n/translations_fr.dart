@@ -126,7 +126,7 @@ const Map<String, dynamic> translationsFr = {
     'mute': 'Désactiver les notifications',
     'unmute': 'Activer les notifications',
     'muted': 'Notifications désactivées pour ce cours',
-    'unmuted': 'Notifications réactivées',
+    'unmuted': 'Notifications réactivées — vous entendrez les nouveaux messages',
     'muteFailed': 'Échec de la mise à jour du silence',
     'delete': 'Supprimer',
     'deleteTitle': 'Supprimer le message',

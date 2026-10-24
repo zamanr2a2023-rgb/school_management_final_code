@@ -6,6 +6,7 @@ import 'package:high_school/core/utils/app_date_format.dart';
 import 'package:high_school/domain/entities/assignment_entity.dart';
 import 'package:high_school/domain/repositories/assignments_repository.dart';
 import 'package:high_school/presentation/providers/language_provider.dart';
+import 'package:high_school/presentation/screens/teacher/teacher_lesson_media_screen.dart';
 import 'package:high_school/presentation/screens/teacher/teacher_pdf_attachment_screen.dart';
 
 class TeacherAssignmentDetailsScreen extends StatefulWidget {
@@ -135,25 +136,65 @@ class _TeacherAssignmentDetailsScreenState extends State<TeacherAssignmentDetail
     await launchUrl(uri, mode: LaunchMode.externalApplication);
   }
 
+  bool _looksLike(String value, List<String> exts) {
+    var lower = value.toLowerCase().trim();
+    try {
+      final path = Uri.parse(value).path;
+      if (path.isNotEmpty) lower = path.toLowerCase();
+    } catch (_) {}
+    lower = lower.split('?').first.split('#').first;
+    return exts.any(lower.endsWith);
+  }
+
+  bool _isImageAttachment(AssignmentAttachmentEntity att) {
+    final mime = att.mimeType?.toLowerCase() ?? '';
+    if (mime.startsWith('image/')) return true;
+    const imageExts = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.heic'];
+    if (_looksLike(att.originalName, imageExts)) return true;
+    final base = att.originalName.trim().toUpperCase();
+    if (base.startsWith('IMG-') || base.startsWith('IMG_')) return true;
+    final url = att.url;
+    if (url == null) return false;
+    if (_looksLike(url, imageExts)) return true;
+    final u = url.toLowerCase();
+    return u.contains('/image/') || u.contains('image/upload');
+  }
+
   bool _isPdfAttachment(AssignmentAttachmentEntity att) {
+    if (_isImageAttachment(att)) return false;
     final mime = att.mimeType?.toLowerCase() ?? '';
     if (mime.contains('pdf')) return true;
-    final u = att.url?.toLowerCase() ?? '';
-    if (u.contains('.pdf')) return true;
+    final u = att.url ?? '';
+    if (_looksLike(u, ['.pdf'])) return true;
     return att.originalName.toLowerCase().endsWith('.pdf');
   }
 
-  void _openPdfViewer(BuildContext context, AssignmentAttachmentEntity att) {
+  void _openAttachment(BuildContext context, AssignmentAttachmentEntity att) {
     final url = att.url;
     if (url == null || url.isEmpty) return;
-    Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (ctx) => TeacherPdfAttachmentScreen(
-          url: url,
-          fileName: att.originalName,
+    if (_isImageAttachment(att)) {
+      Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (ctx) => TeacherLessonImageScreen(
+            url: url,
+            title: att.originalName,
+          ),
         ),
-      ),
-    );
+      );
+      return;
+    }
+    if (_isPdfAttachment(att)) {
+      Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (ctx) => TeacherPdfAttachmentScreen(
+            url: url,
+            fileName: att.originalName,
+          ),
+        ),
+      );
+      return;
+    }
+    _openUrl(url);
   }
 
   /// True when [SubmissionEntity.id] is a real submission id (not a client fallback).
@@ -313,6 +354,7 @@ class _TeacherAssignmentDetailsScreenState extends State<TeacherAssignmentDetail
                           ...attachments.map((att) {
                             final canOpen = att.url != null && att.url!.isNotEmpty;
                             final isPdf = _isPdfAttachment(att);
+                            final isImage = _isImageAttachment(att);
                             return Padding(
                               padding: const EdgeInsets.only(bottom: 8),
                               child: Container(
@@ -326,22 +368,18 @@ class _TeacherAssignmentDetailsScreenState extends State<TeacherAssignmentDetail
                                   crossAxisAlignment: CrossAxisAlignment.center,
                                   children: [
                                     Icon(
-                                      isPdf ? Icons.picture_as_pdf_outlined : Icons.insert_drive_file_outlined,
+                                      isPdf
+                                          ? Icons.picture_as_pdf_outlined
+                                          : isImage
+                                              ? Icons.image_outlined
+                                              : Icons.insert_drive_file_outlined,
                                       color: isPdf ? Colors.red.shade700 : AppTheme.primary,
                                       size: 26,
                                     ),
                                     const SizedBox(width: 10),
                                     Expanded(
                                       child: InkWell(
-                                        onTap: !canOpen
-                                            ? null
-                                            : () {
-                                                if (isPdf) {
-                                                  _openPdfViewer(context, att);
-                                                } else {
-                                                  _openUrl(att.url!);
-                                                }
-                                              },
+                                        onTap: !canOpen ? null : () => _openAttachment(context, att),
                                         borderRadius: BorderRadius.circular(6),
                                         child: Padding(
                                           padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
@@ -366,7 +404,7 @@ class _TeacherAssignmentDetailsScreenState extends State<TeacherAssignmentDetail
                                       IconButton(
                                         tooltip: lang.t('assignments.viewPdf'),
                                         icon: Icon(Icons.visibility_outlined, color: AppTheme.primary),
-                                        onPressed: () => _openPdfViewer(context, att),
+                                        onPressed: () => _openAttachment(context, att),
                                       ),
                                       IconButton(
                                         tooltip: lang.t('common.download'),
@@ -380,8 +418,12 @@ class _TeacherAssignmentDetailsScreenState extends State<TeacherAssignmentDetail
                                     ] else if (canOpen)
                                       IconButton(
                                         tooltip: lang.t('common.view'),
-                                        icon: Icon(Icons.open_in_new, size: 22, color: Colors.grey.shade600),
-                                        onPressed: () => _openUrl(att.url!),
+                                        icon: Icon(
+                                          isImage ? Icons.visibility_outlined : Icons.open_in_new,
+                                          size: 22,
+                                          color: AppTheme.primary,
+                                        ),
+                                        onPressed: () => _openAttachment(context, att),
                                       ),
                                   ],
                                 ),

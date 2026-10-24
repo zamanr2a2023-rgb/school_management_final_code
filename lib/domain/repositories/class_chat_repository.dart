@@ -17,6 +17,10 @@ abstract class ClassChatRepository {
 
   Future<bool> setMuted(String classId, bool muted);
 
+  Future<int> getUnreadCount(String classId);
+
+  Future<void> markAsRead(String classId);
+
   /// Connects socket (if needed), joins class room, and streams new messages.
   Stream<ClassChatMessageEntity> watchMessages(String classId);
 

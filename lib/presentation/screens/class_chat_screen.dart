@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
+import 'package:high_school/core/services/push_notification_service.dart';
 import 'package:high_school/core/theme/app_theme.dart';
 import 'package:high_school/data/datasources/class_chat_remote_datasource.dart';
 import 'package:high_school/domain/entities/class_chat_message_entity.dart';
@@ -34,6 +35,7 @@ class _ClassChatScreenState extends State<ClassChatScreen> {
   StreamSubscription<ClassChatMessageEntity>? _socketSub;
   StreamSubscription<String>? _deletedSub;
   ClassChatRepository? _repo;
+  PushNotificationService? _push;
   bool _loading = true;
   bool _loadingMore = false;
   bool _sending = false;
@@ -55,6 +57,12 @@ class _ClassChatScreenState extends State<ClassChatScreen> {
   Future<void> _bootstrap() async {
     final repo = context.read<ClassChatRepository>();
     _repo = repo;
+    try {
+      _push = context.read<PushNotificationService>();
+      _push!.activeClassChatId = widget.classId;
+    } catch (_) {
+      _push = null;
+    }
     try {
       final room = await repo.getRoom(widget.classId);
       if (!mounted) return;
@@ -78,6 +86,9 @@ class _ClassChatScreenState extends State<ClassChatScreen> {
         _error = null;
       });
       _scrollToBottom(force: true);
+
+      // Opening the chat clears the unread badge for this class.
+      unawaited(repo.markAsRead(widget.classId));
 
       await _socketSub?.cancel();
       await _deletedSub?.cancel();
@@ -113,6 +124,7 @@ class _ClassChatScreenState extends State<ClassChatScreen> {
           m.senderId == msg.senderId &&
           m.text == msg.text,
     );
+    final wasReplace = tempIdx >= 0;
     setState(() {
       if (tempIdx >= 0) {
         _messages[tempIdx] = msg;
@@ -121,6 +133,25 @@ class _ClassChatScreenState extends State<ClassChatScreen> {
       }
     });
     _scrollToBottom();
+
+    // In-app sound for others' messages when notifications are unmuted.
+    if (!wasReplace && !_muted) {
+      final myId = context.read<AuthProvider>().user?.id ?? '';
+      if (myId.isNotEmpty && msg.senderId != myId) {
+        _push?.notifyClassChatMessage(
+          classId: msg.classId,
+          title: _title?.isNotEmpty == true ? _title! : 'Class Chat',
+          body: '${msg.senderName}: ${msg.text}',
+          messageId: msg.id,
+          playSoundOnly: true,
+        );
+      }
+    }
+
+    // Keep unread cursor current while the chat is open.
+    if (!wasReplace) {
+      unawaited(_repo?.markAsRead(widget.classId) ?? Future.value());
+    }
   }
 
   void _onDeleted(String messageId) {
@@ -176,12 +207,21 @@ class _ClassChatScreenState extends State<ClassChatScreen> {
           await context.read<ClassChatRepository>().setMuted(widget.classId, next);
       if (!mounted) return;
       setState(() => _muted = muted);
+      if (!muted) {
+        // Confirm sound works when user unmutes.
+        await _push?.playChatSound();
+      }
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
             muted
                 ? _t(lang, 'chat.muted', 'Notifications muted for this class')
-                : _t(lang, 'chat.unmuted', 'Notifications unmuted'),
+                : _t(
+                    lang,
+                    'chat.unmuted',
+                    'Notifications unmuted — you will hear new messages',
+                  ),
           ),
         ),
       );
@@ -356,6 +396,9 @@ class _ClassChatScreenState extends State<ClassChatScreen> {
     _scrollController.removeListener(_onScroll);
     _socketSub?.cancel();
     _deletedSub?.cancel();
+    if (_push?.activeClassChatId == widget.classId) {
+      _push!.activeClassChatId = null;
+    }
     _repo?.leaveRoom(widget.classId);
     _textController.dispose();
     _scrollController.dispose();
@@ -556,15 +599,32 @@ class _ChatBubble extends StatelessWidget {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
+                    Icon(
+                      message.isTeacher
+                          ? Icons.school_rounded
+                          : Icons.person_outline_rounded,
+                      size: 14,
+                      color: message.isTeacher
+                          ? AppTheme.primary
+                          : Colors.grey.shade600,
+                    ),
+                    const SizedBox(width: 4),
                     Flexible(
                       child: Text(
                         senderName,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                          color: Colors.grey.shade800,
+                          fontSize: message.isTeacher ? 13 : 12,
+                          fontWeight: message.isTeacher
+                              ? FontWeight.w800
+                              : FontWeight.w600,
+                          color: message.isTeacher
+                              ? AppTheme.primary
+                              : Colors.grey.shade700,
+                          fontStyle: message.isTeacher
+                              ? FontStyle.normal
+                              : FontStyle.italic,
                         ),
                       ),
                     ),
@@ -576,18 +636,24 @@ class _ChatBubble extends StatelessWidget {
                       ),
                       decoration: BoxDecoration(
                         color: message.isTeacher
-                            ? AppTheme.primary.withValues(alpha: 0.12)
-                            : Colors.grey.shade200,
+                            ? AppTheme.primary.withValues(alpha: 0.14)
+                            : const Color(0xFFE8F5E9),
                         borderRadius: BorderRadius.circular(6),
+                        border: Border.all(
+                          color: message.isTeacher
+                              ? AppTheme.primary.withValues(alpha: 0.35)
+                              : AppTheme.accent.withValues(alpha: 0.35),
+                          width: 0.8,
+                        ),
                       ),
                       child: Text(
                         roleLabel,
                         style: TextStyle(
                           fontSize: 10,
-                          fontWeight: FontWeight.w600,
+                          fontWeight: FontWeight.w700,
                           color: message.isTeacher
                               ? AppTheme.primary
-                              : Colors.grey.shade700,
+                              : AppTheme.accent,
                         ),
                       ),
                     ),

@@ -18,6 +18,7 @@ import 'package:high_school/domain/repositories/lessons_repository.dart';
 import 'package:high_school/domain/repositories/live_sessions_repository.dart';
 import 'package:high_school/domain/repositories/students_repository.dart';
 import 'package:high_school/presentation/providers/language_provider.dart';
+import 'package:high_school/presentation/widgets/class_chat_badge_button.dart';
 import 'package:high_school/presentation/screens/teacher/teacher_lesson_assignment_dialogs.dart';
 import 'package:high_school/presentation/screens/teacher/teacher_live_session_create_dialog.dart';
 import 'package:high_school/presentation/screens/teacher/teacher_lesson_media_screen.dart';
@@ -177,19 +178,12 @@ class _TeacherClassDetailsScreenState extends State<TeacherClassDetailsScreen> {
                 label: Text(tr(lang, 'classes.backToClasses', 'Back to Classes'), style: const TextStyle(color: Colors.white, fontSize: 14)),
               ),
               const Spacer(),
-              Container(
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.22),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: IconButton(
-                  tooltip: tr(lang, 'chat.title', 'Class Chat'),
-                  onPressed: () => context.push(
-                    '/teacher/classes/${cls.id}/chat',
-                    extra: cls.name,
-                  ),
-                  icon: const Icon(Icons.chat_bubble_outline, color: Colors.white),
-                ),
+              ClassChatBadgeButton(
+                classId: cls.id,
+                chatPath: '/teacher/classes/${cls.id}/chat',
+                className: cls.name,
+                tooltip: tr(lang, 'chat.title', 'Class Chat'),
+                backgroundColor: Colors.white.withValues(alpha: 0.22),
               ),
             ],
           ),
@@ -314,23 +308,51 @@ class _TeacherClassDetailsScreenState extends State<TeacherClassDetailsScreen> {
     );
   }
 
-  static bool _mimeOrNameIsPdf(String? mime, String name) {
-    if (mime != null && mime.toLowerCase().contains('pdf')) return true;
-    return name.toLowerCase().endsWith('.pdf');
+  static bool _nameLooksLike(String nameOrUrl, List<String> exts) {
+    var lower = nameOrUrl.toLowerCase().trim();
+    try {
+      final path = Uri.parse(nameOrUrl).path;
+      if (path.isNotEmpty) lower = path.toLowerCase();
+    } catch (_) {}
+    // Strip query/hash leftovers from plain strings.
+    lower = lower.split('?').first.split('#').first;
+    return exts.any(lower.endsWith);
   }
 
-  static bool _mimeOrNameIsVideo(String? mime, String name) {
-    final ml = mime?.toLowerCase() ?? '';
-    if (ml.contains('video')) return true;
-    final lower = name.toLowerCase();
-    return lower.endsWith('.mp4') || lower.endsWith('.mov') || lower.endsWith('.webm') || lower.endsWith('.mkv');
-  }
-
-  static bool _mimeOrNameIsImage(String? mime, String name) {
+  static bool _mimeOrNameIsImage(String? mime, String name, [String? url]) {
     final ml = mime?.toLowerCase() ?? '';
     if (ml.startsWith('image/')) return true;
-    final lower = name.toLowerCase();
-    return lower.endsWith('.jpg') || lower.endsWith('.jpeg') || lower.endsWith('.png') || lower.endsWith('.gif') || lower.endsWith('.webp');
+    const imageExts = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.heic'];
+    if (_nameLooksLike(name, imageExts)) return true;
+    if (url != null && _nameLooksLike(url, imageExts)) return true;
+    // WhatsApp / camera exports often use IMG-… names (extension may be stripped).
+    final base = name.trim().toUpperCase();
+    if (base.startsWith('IMG-') || base.startsWith('IMG_')) return true;
+    if (url != null) {
+      final u = url.toLowerCase();
+      if (u.contains('/image/') || u.contains('image/upload')) return true;
+    }
+    return false;
+  }
+
+  static bool _mimeOrNameIsVideo(String? mime, String name, [String? url]) {
+    if (_mimeOrNameIsImage(mime, name, url)) return false;
+    final ml = mime?.toLowerCase() ?? '';
+    if (ml.contains('video')) return true;
+    const videoExts = ['.mp4', '.mov', '.webm', '.mkv', '.avi'];
+    if (_nameLooksLike(name, videoExts)) return true;
+    if (url != null && _nameLooksLike(url, videoExts)) return true;
+    return false;
+  }
+
+  static bool _mimeOrNameIsPdf(String? mime, String name, [String? url]) {
+    // Never treat real images as PDFs (API often stores file lessons as contentType=pdf).
+    if (_mimeOrNameIsImage(mime, name, url)) return false;
+    if (_mimeOrNameIsVideo(mime, name, url)) return false;
+    if (mime != null && mime.toLowerCase().contains('pdf')) return true;
+    if (_nameLooksLike(name, ['.pdf'])) return true;
+    if (url != null && _nameLooksLike(url, ['.pdf'])) return true;
+    return false;
   }
 
   void _openLessonMedia(BuildContext context, LessonEntity lesson) {
@@ -339,26 +361,28 @@ class _TeacherClassDetailsScreenState extends State<TeacherClassDetailsScreen> {
     final name = (lesson.attachmentName?.trim().isNotEmpty == true)
         ? lesson.attachmentName!.trim()
         : _lessonFileNameFromContent(url);
-    if (_mimeOrNameIsPdf(lesson.attachmentMimeType, name) || lesson.type == LessonType.pdf) {
+    final mime = lesson.attachmentMimeType;
+    // Images first — backend may mark image uploads as contentType "pdf".
+    if (_mimeOrNameIsImage(mime, name, url)) {
       Navigator.of(context).push(
         MaterialPageRoute<void>(
-          builder: (ctx) => TeacherPdfAttachmentScreen(url: url, fileName: name),
+          builder: (ctx) => TeacherLessonImageScreen(url: url, title: name.isNotEmpty ? name : lesson.title),
         ),
       );
       return;
     }
-    if (_mimeOrNameIsImage(lesson.attachmentMimeType, name)) {
-      Navigator.of(context).push(
-        MaterialPageRoute<void>(
-          builder: (ctx) => TeacherLessonImageScreen(url: url, title: lesson.title),
-        ),
-      );
-      return;
-    }
-    if (_mimeOrNameIsVideo(lesson.attachmentMimeType, name) || lesson.type == LessonType.video) {
+    if (_mimeOrNameIsVideo(mime, name, url) || lesson.type == LessonType.video) {
       Navigator.of(context).push(
         MaterialPageRoute<void>(
           builder: (ctx) => TeacherLessonVideoScreen(url: url, title: lesson.title),
+        ),
+      );
+      return;
+    }
+    if (_mimeOrNameIsPdf(mime, name, url) || lesson.type == LessonType.pdf) {
+      Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (ctx) => TeacherPdfAttachmentScreen(url: url, fileName: name),
         ),
       );
       return;
@@ -370,7 +394,15 @@ class _TeacherClassDetailsScreenState extends State<TeacherClassDetailsScreen> {
     final url = att.url;
     if (url == null || url.isEmpty) return;
     final name = att.originalName;
-    if (_mimeOrNameIsPdf(att.mimeType, name)) {
+    if (_mimeOrNameIsImage(att.mimeType, name, url)) {
+      Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (ctx) => TeacherLessonImageScreen(url: url, title: name),
+        ),
+      );
+      return;
+    }
+    if (_mimeOrNameIsPdf(att.mimeType, name, url)) {
       Navigator.of(context).push(
         MaterialPageRoute<void>(
           builder: (ctx) => TeacherPdfAttachmentScreen(url: url, fileName: name),
@@ -378,7 +410,7 @@ class _TeacherClassDetailsScreenState extends State<TeacherClassDetailsScreen> {
       );
       return;
     }
-    if (_mimeOrNameIsVideo(att.mimeType, name)) {
+    if (_mimeOrNameIsVideo(att.mimeType, name, url)) {
       Navigator.of(context).push(
         MaterialPageRoute<void>(
           builder: (ctx) => TeacherLessonVideoScreen(url: url, title: name),
@@ -403,9 +435,12 @@ class _TeacherClassDetailsScreenState extends State<TeacherClassDetailsScreen> {
     final showMediaRow = isUrl;
     final dateLabel = lesson.date.isNotEmpty ? _formatDate(lesson.date) : (lesson.lastUpdated.isNotEmpty ? _formatDate(lesson.lastUpdated) : '—');
     final updatedLabel = lesson.lastUpdated.isNotEmpty ? _formatDate(lesson.lastUpdated) : dateLabel;
-    final isPdf = _mimeOrNameIsPdf(lesson.attachmentMimeType, fileName) || lesson.type == LessonType.pdf;
-    final isImage = _mimeOrNameIsImage(lesson.attachmentMimeType, fileName);
-    final isVideo = !isImage && (_mimeOrNameIsVideo(lesson.attachmentMimeType, fileName) || lesson.type == LessonType.video);
+    final isImage = _mimeOrNameIsImage(lesson.attachmentMimeType, fileName, content);
+    final isVideo = _mimeOrNameIsVideo(lesson.attachmentMimeType, fileName, content) ||
+        (!isImage && lesson.type == LessonType.video);
+    final isPdf = !isImage &&
+        !isVideo &&
+        (_mimeOrNameIsPdf(lesson.attachmentMimeType, fileName, content) || lesson.type == LessonType.pdf);
     final mediaLabel = isPdf
         ? tr(lang, 'assignments.viewPdf', 'View PDF')
         : isVideo
@@ -565,32 +600,33 @@ class _TeacherClassDetailsScreenState extends State<TeacherClassDetailsScreen> {
                     ],
                   ),
                 ),
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    IconButton(
-                      visualDensity: VisualDensity.compact,
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
-                      onPressed: () => _toggleLessonPublishedStatus(context, lang, cls, lesson),
-                      icon: Icon(lesson.status == LessonStatus.published ? Icons.visibility_off_outlined : Icons.visibility_outlined, size: 20, color: AppTheme.primary),
-                    ),
-                    IconButton(
-                      visualDensity: VisualDensity.compact,
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
-                      onPressed: () => _showCreateLessonDialog(context, lang, cls, lesson),
-                      icon: const Icon(Icons.edit_outlined, size: 20, color: AppTheme.primary),
-                    ),
-                    IconButton(
-                      visualDensity: VisualDensity.compact,
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
-                      onPressed: () => _confirmDeleteLesson(context, lang, lesson),
-                      icon: Icon(Icons.delete_outline_rounded, size: 20, color: Colors.red.shade600),
-                    ),
-                  ],
-                ),
+                if (!lesson.uploadedByAdmin)
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      IconButton(
+                        visualDensity: VisualDensity.compact,
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                        onPressed: () => _toggleLessonPublishedStatus(context, lang, cls, lesson),
+                        icon: Icon(lesson.status == LessonStatus.published ? Icons.visibility_off_outlined : Icons.visibility_outlined, size: 20, color: AppTheme.primary),
+                      ),
+                      IconButton(
+                        visualDensity: VisualDensity.compact,
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                        onPressed: () => _showCreateLessonDialog(context, lang, cls, lesson),
+                        icon: const Icon(Icons.edit_outlined, size: 20, color: AppTheme.primary),
+                      ),
+                      IconButton(
+                        visualDensity: VisualDensity.compact,
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                        onPressed: () => _confirmDeleteLesson(context, lang, lesson),
+                        icon: Icon(Icons.delete_outline_rounded, size: 20, color: Colors.red.shade600),
+                      ),
+                    ],
+                  ),
               ],
             ),
           ],
@@ -873,11 +909,13 @@ class _TeacherClassDetailsScreenState extends State<TeacherClassDetailsScreen> {
                             child: Row(
                               children: [
                                 Icon(
-                                  _mimeOrNameIsPdf(att.mimeType, att.originalName)
-                                      ? Icons.picture_as_pdf_outlined
-                                      : _mimeOrNameIsVideo(att.mimeType, att.originalName)
-                                          ? Icons.play_circle_outline
-                                          : Icons.insert_drive_file_outlined,
+                                  _mimeOrNameIsImage(att.mimeType, att.originalName, att.url)
+                                      ? Icons.image_outlined
+                                      : _mimeOrNameIsPdf(att.mimeType, att.originalName, att.url)
+                                          ? Icons.picture_as_pdf_outlined
+                                          : _mimeOrNameIsVideo(att.mimeType, att.originalName, att.url)
+                                              ? Icons.play_circle_outline
+                                              : Icons.insert_drive_file_outlined,
                                   size: 22,
                                   color: AppTheme.primary,
                                 ),
@@ -898,7 +936,7 @@ class _TeacherClassDetailsScreenState extends State<TeacherClassDetailsScreen> {
                                       ),
                                       const SizedBox(height: 2),
                                       Text(
-                                        _mimeOrNameIsPdf(att.mimeType, att.originalName)
+                                        _mimeOrNameIsPdf(att.mimeType, att.originalName, att.url)
                                             ? tr(lang, 'assignments.viewPdf', 'View PDF')
                                             : tr(lang, 'common.view', 'View'),
                                         style: TextStyle(fontSize: 11, color: Colors.grey.shade600),

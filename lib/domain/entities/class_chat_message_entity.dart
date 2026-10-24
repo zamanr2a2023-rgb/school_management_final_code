@@ -56,6 +56,7 @@ class ClassChatRoomEntity {
     this.subject = '',
     this.gradeLevel = '',
     this.memberCount = 0,
+    this.unreadCount = 0,
   });
 
   final String classId;
@@ -63,6 +64,7 @@ class ClassChatRoomEntity {
   final String subject;
   final String gradeLevel;
   final int memberCount;
+  final int unreadCount;
 
   factory ClassChatRoomEntity.fromJson(Map<String, dynamic> json) {
     return ClassChatRoomEntity(
@@ -71,6 +73,7 @@ class ClassChatRoomEntity {
       subject: (json['subject'] ?? '').toString(),
       gradeLevel: (json['gradeLevel'] ?? '').toString(),
       memberCount: int.tryParse('${json['memberCount'] ?? 0}') ?? 0,
+      unreadCount: int.tryParse('${json['unreadCount'] ?? 0}') ?? 0,
     );
   }
 }

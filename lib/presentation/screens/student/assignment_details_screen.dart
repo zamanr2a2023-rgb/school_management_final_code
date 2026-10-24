@@ -12,6 +12,7 @@ import 'package:high_school/domain/repositories/assignments_repository.dart';
 import 'package:high_school/domain/repositories/classes_repository.dart';
 import 'package:high_school/domain/repositories/student_assignment_details_repository.dart';
 import 'package:high_school/presentation/providers/language_provider.dart';
+import 'package:high_school/presentation/screens/teacher/teacher_lesson_media_screen.dart';
 import 'package:high_school/presentation/screens/teacher/teacher_pdf_attachment_screen.dart';
 
 class _AssignmentScreenData {
@@ -121,6 +122,17 @@ class _AssignmentDetailsScreenState extends State<AssignmentDetailsScreen> {
   void _openAttachment(BuildContext context, AssignmentAttachmentEntity att) {
     final url = att.url;
     if (url == null || url.isEmpty) return;
+    if (_isImageAttachment(att)) {
+      Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (ctx) => TeacherLessonImageScreen(
+            url: url,
+            title: att.originalName,
+          ),
+        ),
+      );
+      return;
+    }
     if (_isPdfAttachment(att)) {
       Navigator.of(context).push(
         MaterialPageRoute<void>(
@@ -621,9 +633,36 @@ class _AssignmentDetailsScreenState extends State<AssignmentDetailsScreen> {
     );
   }
 
+  bool _looksLike(String value, List<String> exts) {
+    var lower = value.toLowerCase().trim();
+    try {
+      final path = Uri.parse(value).path;
+      if (path.isNotEmpty) lower = path.toLowerCase();
+    } catch (_) {}
+    lower = lower.split('?').first.split('#').first;
+    return exts.any(lower.endsWith);
+  }
+
+  bool _isImageAttachment(AssignmentAttachmentEntity att) {
+    final mime = att.mimeType?.toLowerCase() ?? '';
+    if (mime.startsWith('image/')) return true;
+    const imageExts = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.heic'];
+    if (_looksLike(att.originalName, imageExts)) return true;
+    final base = att.originalName.trim().toUpperCase();
+    if (base.startsWith('IMG-') || base.startsWith('IMG_')) return true;
+    final url = att.url;
+    if (url == null) return false;
+    if (_looksLike(url, imageExts)) return true;
+    final u = url.toLowerCase();
+    return u.contains('/image/') || u.contains('image/upload');
+  }
+
   bool _isPdfAttachment(AssignmentAttachmentEntity att) {
+    if (_isImageAttachment(att)) return false;
     final mime = att.mimeType?.toLowerCase() ?? '';
     if (mime.contains('pdf')) return true;
+    final url = att.url;
+    if (url != null && _looksLike(url, ['.pdf'])) return true;
     return att.originalName.toLowerCase().endsWith('.pdf');
   }
 
@@ -657,6 +696,7 @@ class _AssignmentDetailsScreenState extends State<AssignmentDetailsScreen> {
 
   Widget _buildAttachmentTile(LanguageProvider lang, AssignmentAttachmentEntity att) {
     final isPdf = _isPdfAttachment(att);
+    final isImage = _isImageAttachment(att);
     final iconColor = isPdf ? Colors.red.shade700 : AppTheme.primary;
     final iconBg = isPdf ? Colors.red.shade50 : AppTheme.primary.withValues(alpha: 0.08);
 
@@ -694,7 +734,11 @@ class _AssignmentDetailsScreenState extends State<AssignmentDetailsScreen> {
                   height: 40,
                   decoration: BoxDecoration(color: iconBg, borderRadius: BorderRadius.circular(10)),
                   child: Icon(
-                    isPdf ? Icons.picture_as_pdf_rounded : Icons.insert_drive_file_rounded,
+                    isPdf
+                        ? Icons.picture_as_pdf_rounded
+                        : isImage
+                            ? Icons.image_rounded
+                            : Icons.insert_drive_file_rounded,
                     size: 22,
                     color: iconColor,
                   ),
@@ -725,7 +769,7 @@ class _AssignmentDetailsScreenState extends State<AssignmentDetailsScreen> {
                     shape: BoxShape.circle,
                   ),
                   child: Icon(
-                    isPdf ? Icons.visibility_outlined : Icons.open_in_new_rounded,
+                    isPdf || isImage ? Icons.visibility_outlined : Icons.open_in_new_rounded,
                     size: 18,
                     color: AppTheme.primary,
                   ),

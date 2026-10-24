@@ -125,7 +125,7 @@ const Map<String, dynamic> translationsAr = {
     'mute': 'كتم الإشعارات',
     'unmute': 'إلغاء كتم الإشعارات',
     'muted': 'تم كتم إشعارات هذا الصف',
-    'unmuted': 'تم إلغاء كتم الإشعارات',
+    'unmuted': 'تم إلغاء كتم الإشعارات — ستسمع الرسائل الجديدة',
     'muteFailed': 'فشل تحديث الكتم',
     'delete': 'حذف',
     'deleteTitle': 'حذف الرسالة',

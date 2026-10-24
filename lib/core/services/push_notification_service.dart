@@ -4,11 +4,12 @@ import 'dart:io';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:high_school/data/datasources/class_chat_remote_datasource.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-/// Handles FCM + local notifications for class chat.
+/// Handles FCM + local / in-app notifications for class chat (with sound).
 /// Soft-fails when Firebase is not configured (no google-services.json / options).
 class PushNotificationService {
   PushNotificationService(this._prefs, this._chatRemote);
@@ -25,11 +26,18 @@ class PushNotificationService {
   String? _token;
   void Function(String classId)? onOpenClassChat;
 
+  /// Class chat currently open — skip banner for that room (sound still optional).
+  String? activeClassChatId;
+
+  // Channel id bumped when sound settings change (Android freezes channel config).
   static const _androidChannel = AndroidNotificationChannel(
-    'class_chat',
+    'class_chat_v2',
     'Class Chat',
     description: 'Notifications for new class chat messages',
     importance: Importance.high,
+    playSound: true,
+    enableVibration: true,
+    showBadge: true,
   );
 
   String? get token => _token;
@@ -41,40 +49,20 @@ class PushNotificationService {
       await Firebase.initializeApp();
     } catch (e) {
       debugPrint('[push] Firebase.initializeApp failed (optional): $e');
+      // Still init local notifications for in-app alerts without FCM.
+      await _initLocalOnly();
       return;
     }
 
     try {
-      const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
-      const iosInit = DarwinInitializationSettings();
-      await _local.initialize(
-        settings: const InitializationSettings(
-          android: androidInit,
-          iOS: iosInit,
-        ),
-        onDidReceiveNotificationResponse: (response) {
-          final payload = response.payload;
-          if (payload == null || payload.isEmpty) return;
-          try {
-            final map = jsonDecode(payload) as Map<String, dynamic>;
-            final classId = map['classId']?.toString() ?? '';
-            if (classId.isNotEmpty) onOpenClassChat?.call(classId);
-          } catch (_) {}
-        },
-      );
-
-      if (Platform.isAndroid) {
-        await _local
-            .resolvePlatformSpecificImplementation<
-                AndroidFlutterLocalNotificationsPlugin>()
-            ?.createNotificationChannel(_androidChannel);
-      }
+      await _initLocalOnly();
 
       final messaging = FirebaseMessaging.instance;
       await messaging.requestPermission(
         alert: true,
         badge: true,
         sound: true,
+        announcement: true,
       );
 
       FirebaseMessaging.onMessage.listen(_showForeground);
@@ -100,6 +88,37 @@ class PushNotificationService {
     } catch (e) {
       debugPrint('[push] init failed (optional): $e');
       _ready = false;
+    }
+  }
+
+  Future<void> _initLocalOnly() async {
+    const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
+    const iosInit = DarwinInitializationSettings(
+      requestAlertPermission: true,
+      requestBadgePermission: true,
+      requestSoundPermission: true,
+    );
+    await _local.initialize(
+      settings: const InitializationSettings(
+        android: androidInit,
+        iOS: iosInit,
+      ),
+      onDidReceiveNotificationResponse: (response) {
+        final payload = response.payload;
+        if (payload == null || payload.isEmpty) return;
+        try {
+          final map = jsonDecode(payload) as Map<String, dynamic>;
+          final classId = map['classId']?.toString() ?? '';
+          if (classId.isNotEmpty) onOpenClassChat?.call(classId);
+        } catch (_) {}
+      },
+    );
+
+    if (!kIsWeb && Platform.isAndroid) {
+      await _local
+          .resolvePlatformSpecificImplementation<
+              AndroidFlutterLocalNotificationsPlugin>()
+          ?.createNotificationChannel(_androidChannel);
     }
   }
 
@@ -133,6 +152,40 @@ class PushNotificationService {
     _token = null;
   }
 
+  /// Play alert sound + haptic (e.g. when user unmutes notifications).
+  Future<void> playChatSound() async {
+    try {
+      await HapticFeedback.mediumImpact();
+      await SystemSound.play(SystemSoundType.alert);
+    } catch (e) {
+      debugPrint('[push] playChatSound failed: $e');
+    }
+  }
+
+  /// In-app heads-up notification + sound for a new class chat message.
+  Future<void> notifyClassChatMessage({
+    required String classId,
+    required String title,
+    required String body,
+    String? messageId,
+    bool playSoundOnly = false,
+  }) async {
+    if (classId.isEmpty) return;
+
+    final viewingThisChat =
+        activeClassChatId != null && activeClassChatId == classId;
+
+    await HapticFeedback.mediumImpact();
+    await _showLocal(
+      title: title,
+      body: body,
+      classId: classId,
+      messageId: messageId ?? '',
+      // Brief banner while already in the chat; full sticky when elsewhere.
+      timeoutAfterMs: (playSoundOnly || viewingThisChat) ? 2500 : null,
+    );
+  }
+
   void _handleRemoteOpen(RemoteMessage message) {
     final classId = message.data['classId']?.toString() ?? '';
     if (classId.isNotEmpty) {
@@ -143,36 +196,74 @@ class PushNotificationService {
   }
 
   Future<void> _showForeground(RemoteMessage message) async {
+    final classId = message.data['classId']?.toString() ?? '';
+    // Socket path already notifies while this chat is open — avoid double alert.
+    if (classId.isNotEmpty && activeClassChatId == classId) {
+      return;
+    }
+
     final title = message.notification?.title ??
         message.data['title']?.toString() ??
         'Class Chat';
     final body = message.notification?.body ??
         message.data['body']?.toString() ??
         '';
-    final classId = message.data['classId']?.toString() ?? '';
-    final payload = jsonEncode({
-      'type': message.data['type'] ?? 'class_chat',
-      'classId': classId,
-      'messageId': message.data['messageId']?.toString() ?? '',
-    });
 
-    await _local.show(
-      id: message.hashCode,
+    await notifyClassChatMessage(
+      classId: classId,
       title: title,
       body: body,
-      notificationDetails: NotificationDetails(
-        android: AndroidNotificationDetails(
-          _androidChannel.id,
-          _androidChannel.name,
-          channelDescription: _androidChannel.description,
-          importance: Importance.high,
-          priority: Priority.high,
-          icon: '@mipmap/ic_launcher',
-        ),
-        iOS: const DarwinNotificationDetails(),
-      ),
-      payload: payload,
+      messageId: message.data['messageId']?.toString(),
     );
+  }
+
+  Future<void> _showLocal({
+    required String title,
+    required String body,
+    required String classId,
+    String messageId = '',
+    String type = 'class_chat',
+    int? timeoutAfterMs,
+  }) async {
+    final payload = jsonEncode({
+      'type': type,
+      'classId': classId,
+      'messageId': messageId,
+    });
+
+    try {
+      await _local.show(
+        id: Object.hash(classId, messageId, title, body) & 0x7fffffff,
+        title: title,
+        body: body,
+        notificationDetails: NotificationDetails(
+          android: AndroidNotificationDetails(
+            _androidChannel.id,
+            _androidChannel.name,
+            channelDescription: _androidChannel.description,
+            importance: Importance.high,
+            priority: Priority.high,
+            playSound: true,
+            enableVibration: true,
+            icon: '@mipmap/ic_launcher',
+            category: AndroidNotificationCategory.message,
+            timeoutAfter: timeoutAfterMs,
+          ),
+          iOS: const DarwinNotificationDetails(
+            presentAlert: true,
+            presentBadge: true,
+            presentSound: true,
+            sound: 'default',
+          ),
+        ),
+        payload: payload,
+      );
+    } catch (e) {
+      debugPrint('[push] show local failed: $e');
+      try {
+        await SystemSound.play(SystemSoundType.alert);
+      } catch (_) {}
+    }
   }
 }
 

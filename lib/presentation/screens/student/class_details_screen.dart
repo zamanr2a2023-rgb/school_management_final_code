@@ -11,6 +11,7 @@ import 'package:high_school/domain/repositories/classes_repository.dart';
 import 'package:high_school/domain/repositories/lessons_repository.dart';
 import 'package:high_school/domain/repositories/student_classes_repository.dart';
 import 'package:high_school/presentation/providers/language_provider.dart';
+import 'package:high_school/presentation/widgets/class_chat_badge_button.dart';
 
 class _ClassDetailsLoaded {
   const _ClassDetailsLoaded({
@@ -136,14 +137,14 @@ class ClassDetailsScreen extends StatelessWidget {
                               ),
                             ),
                           ),
-                          IconButton(
+                          ClassChatBadgeButton(
+                            classId: cls.id,
+                            chatPath: '/student/classes/${cls.id}/chat',
+                            className: cls.name,
                             tooltip: lang.t('chat.title'),
-                            onPressed: () => context.push(
-                              '/student/classes/${cls.id}/chat',
-                              extra: cls.name,
-                            ),
-                            icon: const Icon(Icons.chat_bubble_outline,
-                                color: Colors.white, size: 22),
+                            iconSize: 22,
+                            backgroundColor:
+                                Colors.white.withValues(alpha: 0.22),
                             padding: EdgeInsets.zero,
                             constraints: const BoxConstraints(
                               minWidth: 36,

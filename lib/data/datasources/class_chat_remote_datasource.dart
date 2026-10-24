@@ -156,6 +156,80 @@ class ClassChatRemoteDatasource {
     }
   }
 
+  String _localReadKey(String classId) => 'class_chat_last_read_$classId';
+
+  /// Works even when the server unread API is not deployed yet (local fallback).
+  Future<int> getUnreadCount(String classId) async {
+    if (!isConfigured || classId.isEmpty || _token == null || _token!.isEmpty) {
+      return 0;
+    }
+
+    // Prefer server unread count when available.
+    try {
+      final uri = Uri.parse('$_apiBase/chat/classes/$classId/unread');
+      final response = await http.get(uri, headers: _headers);
+      if (response.statusCode == 200) {
+        final decoded = jsonDecode(response.body) as Map<String, dynamic>?;
+        ensureAuthorized(decoded);
+        final data = decoded?['data'];
+        if (data is Map && data.containsKey('unreadCount')) {
+          return int.tryParse('${data['unreadCount'] ?? 0}') ?? 0;
+        }
+      }
+    } on UnauthorizedApiException {
+      rethrow;
+    } catch (_) {
+      // Fall through to local count.
+    }
+
+    return _localUnreadCount(classId);
+  }
+
+  Future<int> _localUnreadCount(String classId) async {
+    final myId = _prefs.getString(AppConstants.sessionUserIdKey) ?? '';
+    final lastReadMs = _prefs.getInt(_localReadKey(classId));
+    final lastRead = lastReadMs == null
+        ? null
+        : DateTime.fromMillisecondsSinceEpoch(lastReadMs, isUtc: true);
+
+    final page = await getMessages(classId, limit: 50);
+    var count = 0;
+    for (final m in page.messages) {
+      if (myId.isNotEmpty && m.senderId == myId) continue;
+      if (lastRead != null && !m.createdAt.toUtc().isAfter(lastRead)) {
+        continue;
+      }
+      count++;
+    }
+    return count;
+  }
+
+  Future<void> markAsRead(String classId) async {
+    if (classId.isEmpty) return;
+
+    // Always persist locally so badges clear even if server lacks /read.
+    await _prefs.setInt(
+      _localReadKey(classId),
+      DateTime.now().toUtc().millisecondsSinceEpoch,
+    );
+
+    if (!isConfigured || _token == null || _token!.isEmpty) return;
+
+    try {
+      final uri = Uri.parse('$_apiBase/chat/classes/$classId/read');
+      final response = await http.put(uri, headers: _headers);
+      if (response.statusCode == 200) {
+        final decoded = jsonDecode(response.body) as Map<String, dynamic>?;
+        ensureAuthorized(decoded);
+      }
+      // 404/501 etc. = endpoint not on this host yet; local read is enough.
+    } on UnauthorizedApiException {
+      rethrow;
+    } catch (_) {
+      // ignore network / parse errors
+    }
+  }
+
   Future<bool> getMuted(String classId) async {
     if (!isConfigured || classId.isEmpty || _token == null || _token!.isEmpty) {
       return false;

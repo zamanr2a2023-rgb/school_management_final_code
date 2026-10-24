@@ -7,6 +7,7 @@ import 'package:high_school/domain/entities/lesson_entity.dart';
 import 'package:high_school/domain/entities/student_lesson_detail.dart';
 import 'package:high_school/domain/repositories/lessons_repository.dart';
 import 'package:high_school/presentation/providers/language_provider.dart';
+import 'package:high_school/presentation/screens/teacher/teacher_lesson_media_screen.dart';
 import 'package:high_school/presentation/screens/teacher/teacher_pdf_attachment_screen.dart';
 import 'package:high_school/presentation/widgets/lesson_video_player.dart';
 
@@ -75,26 +76,57 @@ class _LessonDetailsScreenState extends State<LessonDetailsScreen> {
     }
   }
 
-  static String _pdfFileName(StudentLessonDetail lesson, String url) {
+  static bool _urlLooksLikeImage(String url) {
+    var lower = url.toLowerCase().trim();
+    final raw = lower;
+    try {
+      final path = Uri.parse(url).path;
+      if (path.isNotEmpty) lower = path.toLowerCase();
+    } catch (_) {}
+    lower = lower.split('?').first.split('#').first;
+    const imageExts = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.heic'];
+    if (imageExts.any(lower.endsWith)) return true;
+    if (raw.contains('/image/') || raw.contains('image/upload')) return true;
+    final seg = lower.split('/').lastWhere((s) => s.isNotEmpty, orElse: () => '');
+    final upper = seg.toUpperCase();
+    return upper.startsWith('IMG-') || upper.startsWith('IMG_');
+  }
+
+  static String _mediaFileName(StudentLessonDetail lesson, String url) {
     try {
       final seg = Uri.parse(url).pathSegments.lastWhere(
             (s) => s.isNotEmpty,
             orElse: () => '',
           );
-      if (seg.toLowerCase().endsWith('.pdf')) {
+      if (seg.isNotEmpty) {
         return Uri.decodeComponent(seg);
       }
     } catch (_) {}
     final title = lesson.title.trim();
+    if (_urlLooksLikeImage(url)) {
+      return title.isEmpty ? 'image' : title;
+    }
     return title.isEmpty ? 'lesson.pdf' : '$title.pdf';
   }
 
-  void _openPdfViewer(BuildContext context, StudentLessonDetail lesson, String url) {
+  void _openMediaViewer(BuildContext context, StudentLessonDetail lesson, String url) {
+    final fileName = _mediaFileName(lesson, url);
+    if (_urlLooksLikeImage(url)) {
+      Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (ctx) => TeacherLessonImageScreen(
+            url: url,
+            title: fileName,
+          ),
+        ),
+      );
+      return;
+    }
     Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (ctx) => TeacherPdfAttachmentScreen(
           url: url,
-          fileName: _pdfFileName(lesson, url),
+          fileName: fileName,
         ),
       ),
     );
@@ -289,6 +321,7 @@ class _LessonDetailsScreenState extends State<LessonDetailsScreen> {
                 ),
         );
       case LessonType.pdf:
+        final isImage = primaryUrl != null && _urlLooksLikeImage(primaryUrl);
         return Container(
           padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
           decoration: BoxDecoration(
@@ -297,43 +330,51 @@ class _LessonDetailsScreenState extends State<LessonDetailsScreen> {
           ),
           child: Column(
             children: [
-              Icon(Icons.picture_as_pdf_outlined, size: 48, color: Colors.grey.shade400),
+              Icon(
+                isImage ? Icons.image_outlined : Icons.picture_as_pdf_outlined,
+                size: 48,
+                color: Colors.grey.shade400,
+              ),
               const SizedBox(height: 10),
               Text(
-                lang.t('lessons.pdfDocument'),
+                isImage ? lang.t('common.view') : lang.t('lessons.pdfDocument'),
                 style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
               ),
-              const SizedBox(height: 4),
-              Text(
-                lang.t('lessons.pdfOpenHint'),
-                style: Theme.of(context).textTheme.labelSmall?.copyWith(color: Colors.grey.shade600),
-                textAlign: TextAlign.center,
-              ),
+              if (!isImage) ...[
+                const SizedBox(height: 4),
+                Text(
+                  lang.t('lessons.pdfOpenHint'),
+                  style: Theme.of(context).textTheme.labelSmall?.copyWith(color: Colors.grey.shade600),
+                  textAlign: TextAlign.center,
+                ),
+              ],
               const SizedBox(height: 16),
               if (primaryUrl != null && primaryUrl.isNotEmpty) ...[
-                SizedBox(
-                  width: double.infinity,
-                  child: OutlinedButton.icon(
-                    onPressed: () => downloadTeacherPdfAttachment(
-                      context,
-                      primaryUrl,
-                      _pdfFileName(lesson, primaryUrl),
+                if (!isImage) ...[
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      onPressed: () => downloadTeacherPdfAttachment(
+                        context,
+                        primaryUrl,
+                        _mediaFileName(lesson, primaryUrl),
+                      ),
+                      icon: const Icon(Icons.download_outlined, size: 18),
+                      label: Text(lang.t('lessons.downloadPDF')),
                     ),
-                    icon: const Icon(Icons.download_outlined, size: 18),
-                    label: Text(lang.t('lessons.downloadPDF')),
                   ),
-                ),
-                const SizedBox(height: 8),
+                  const SizedBox(height: 8),
+                ],
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton.icon(
-                    onPressed: () => _openPdfViewer(context, lesson, primaryUrl),
+                    onPressed: () => _openMediaViewer(context, lesson, primaryUrl),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppTheme.primary,
                       foregroundColor: Colors.white,
                     ),
                     icon: const Icon(Icons.visibility_outlined, size: 18),
-                    label: Text(lang.t('lessons.viewPdf')),
+                    label: Text(isImage ? lang.t('common.view') : lang.t('lessons.viewPdf')),
                   ),
                 ),
               ] else

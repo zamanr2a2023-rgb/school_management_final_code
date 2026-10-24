@@ -220,7 +220,7 @@ const Map<String, dynamic> translationsEn = {
     'mute': 'Mute notifications',
     'unmute': 'Unmute notifications',
     'muted': 'Notifications muted for this class',
-    'unmuted': 'Notifications unmuted',
+    'unmuted': 'Notifications unmuted — you will hear new messages',
     'muteFailed': 'Failed to update mute',
     'delete': 'Delete',
     'deleteTitle': 'Delete message',

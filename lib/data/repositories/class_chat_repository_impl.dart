@@ -36,6 +36,13 @@ class ClassChatRepositoryImpl implements ClassChatRepository {
       _remote.setMuted(classId, muted);
 
   @override
+  Future<int> getUnreadCount(String classId) =>
+      _remote.getUnreadCount(classId);
+
+  @override
+  Future<void> markAsRead(String classId) => _remote.markAsRead(classId);
+
+  @override
   Stream<ClassChatMessageEntity> watchMessages(String classId) {
     _socket.connectAndJoin(classId);
     return _socket.messages.where((m) => m.classId == classId || classId.isEmpty);

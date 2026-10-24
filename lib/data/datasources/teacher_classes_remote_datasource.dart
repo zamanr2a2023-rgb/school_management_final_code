@@ -235,10 +235,23 @@ class TeacherClassesRemoteDatasource {
       attachmentMime = firstAtt['mime'];
       attachmentName = firstAtt['name'];
       final mimeLower = attachmentMime?.toLowerCase() ?? '';
-      if (mimeLower.contains('pdf')) {
-        type = LessonType.pdf;
-      } else if (mimeLower.contains('video')) {
+      final nameLower = (attachmentName ?? '').toLowerCase();
+      final isImage = mimeLower.startsWith('image/') ||
+          nameLower.endsWith('.jpg') ||
+          nameLower.endsWith('.jpeg') ||
+          nameLower.endsWith('.png') ||
+          nameLower.endsWith('.gif') ||
+          nameLower.endsWith('.webp') ||
+          nameLower.endsWith('.bmp') ||
+          nameLower.endsWith('.heic');
+      if (mimeLower.contains('video')) {
         type = LessonType.video;
+      } else if (mimeLower.contains('pdf') && !isImage) {
+        type = LessonType.pdf;
+      } else if (isImage && type == LessonType.text) {
+        // File lessons are often stored as contentType=pdf; keep as pdf slot but
+        // UI routes by mime/name. Prefer pdf type so the media row is shown.
+        type = LessonType.pdf;
       }
     }
     if (content.isNotEmpty && !content.startsWith('http://') && !content.startsWith('https://')) {
