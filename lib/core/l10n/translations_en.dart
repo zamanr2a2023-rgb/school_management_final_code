@@ -27,6 +27,10 @@ const Map<String, dynamic> translationsEn = {
     'retry': 'Try again',
     'notProvided': 'Not provided',
   },
+  'contentProtection': {
+    'recordingBlocked':
+        'Screen recording or mirroring is active. Protected content is hidden until you stop recording.',
+  },
   'subjects': {
     'english': 'English',
     'mathematics': 'Mathematics',
@@ -291,7 +295,7 @@ const Map<String, dynamic> translationsEn = {
     'openVideoLink': 'Open Video Link',
     'videoPlayerPlaceholder': 'Video Player Placeholder',
     'viewPdf': 'View PDF',
-    'pdfOpenHint': 'Click to download or view the PDF',
+    'pdfOpenHint': 'Open the PDF to view it in the app',
     'lessonNotFound': 'Lesson not found',
   },
   'assignments': {

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:high_school/core/theme/app_theme.dart';
 import 'package:high_school/presentation/widgets/lesson_video_player.dart';
+import 'package:high_school/presentation/widgets/protected_content_scope.dart';
 
 /// Full-screen in-app video for teacher lesson attachments.
 class TeacherLessonVideoScreen extends StatelessWidget {
@@ -22,10 +23,12 @@ class TeacherLessonVideoScreen extends StatelessWidget {
         foregroundColor: Colors.white,
         title: Text(title, maxLines: 1, overflow: TextOverflow.ellipsis),
       ),
-      body: Center(
-        child: AspectRatio(
-          aspectRatio: 16 / 9,
-          child: LessonVideoPlayer(url: url),
+      body: ProtectedContentScope(
+        child: Center(
+          child: AspectRatio(
+            aspectRatio: 16 / 9,
+            child: LessonVideoPlayer(url: url),
+          ),
         ),
       ),
     );
@@ -51,20 +54,22 @@ class TeacherLessonImageScreen extends StatelessWidget {
         foregroundColor: Colors.white,
         title: Text(title, maxLines: 1, overflow: TextOverflow.ellipsis),
       ),
-      body: InteractiveViewer(
-        minScale: 0.5,
-        maxScale: 4,
-        child: Center(
-          child: Image.network(
-            url,
-            fit: BoxFit.contain,
-            width: double.infinity,
-            loadingBuilder: (context, child, progress) {
-              if (progress == null) return child;
-              return const Center(child: CircularProgressIndicator());
-            },
-            errorBuilder: (_, __, ___) => const Center(
-              child: Icon(Icons.broken_image_outlined, size: 48, color: Colors.grey),
+      body: ProtectedContentScope(
+        child: InteractiveViewer(
+          minScale: 0.5,
+          maxScale: 4,
+          child: Center(
+            child: Image.network(
+              url,
+              fit: BoxFit.contain,
+              width: double.infinity,
+              loadingBuilder: (context, child, progress) {
+                if (progress == null) return child;
+                return const Center(child: CircularProgressIndicator());
+              },
+              errorBuilder: (_, __, ___) => const Center(
+                child: Icon(Icons.broken_image_outlined, size: 48, color: Colors.grey),
+              ),
             ),
           ),
         ),

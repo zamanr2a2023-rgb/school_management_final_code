@@ -1,5 +1,6 @@
 import 'package:chewie/chewie.dart';
 import 'package:flutter/material.dart';
+import 'package:high_school/core/security/content_protection_service.dart';
 import 'package:video_player/video_player.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
@@ -24,7 +25,14 @@ class _LessonVideoPlayerState extends State<LessonVideoPlayer> {
   @override
   void initState() {
     super.initState();
+    ContentProtectionService.captureBlockingActive.addListener(_onCaptureBlockingChanged);
     _initPlayer();
+  }
+
+  void _onCaptureBlockingChanged() {
+    if (!ContentProtectionService.captureBlockingActive.value) return;
+    _videoController?.pause();
+    _chewieController?.pause();
   }
 
   Future<void> _initPlayer() async {
@@ -90,6 +98,7 @@ class _LessonVideoPlayerState extends State<LessonVideoPlayer> {
         videoPlayerController: controller,
         autoPlay: false,
         looping: false,
+        showOptions: false,
         aspectRatio: controller.value.aspectRatio == 0 ? 16 / 9 : controller.value.aspectRatio,
         materialProgressColors: ChewieProgressColors(
           playedColor: Colors.blue.shade400,
@@ -144,6 +153,7 @@ class _LessonVideoPlayerState extends State<LessonVideoPlayer> {
 
   @override
   void dispose() {
+    ContentProtectionService.captureBlockingActive.removeListener(_onCaptureBlockingChanged);
     _chewieController?.dispose();
     _videoController?.dispose();
     super.dispose();

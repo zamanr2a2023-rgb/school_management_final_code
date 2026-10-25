@@ -10,6 +10,7 @@ import 'package:high_school/presentation/providers/language_provider.dart';
 import 'package:high_school/presentation/screens/teacher/teacher_lesson_media_screen.dart';
 import 'package:high_school/presentation/screens/teacher/teacher_pdf_attachment_screen.dart';
 import 'package:high_school/presentation/widgets/lesson_video_player.dart';
+import 'package:high_school/presentation/widgets/protected_content_scope.dart';
 
 class LessonDetailsScreen extends StatefulWidget {
   const LessonDetailsScreen({super.key, required this.lessonId});
@@ -298,7 +299,9 @@ class _LessonDetailsScreenState extends State<LessonDetailsScreen> {
         return AspectRatio(
           aspectRatio: 16 / 9,
           child: primaryUrl != null && primaryUrl.isNotEmpty
-              ? LessonVideoPlayer(url: primaryUrl)
+              ? ProtectedContentScope(
+                  child: LessonVideoPlayer(url: primaryUrl),
+                )
               : Container(
                   decoration: BoxDecoration(
                     color: const Color(0xFF111827),
@@ -350,21 +353,6 @@ class _LessonDetailsScreenState extends State<LessonDetailsScreen> {
               ],
               const SizedBox(height: 16),
               if (primaryUrl != null && primaryUrl.isNotEmpty) ...[
-                if (!isImage) ...[
-                  SizedBox(
-                    width: double.infinity,
-                    child: OutlinedButton.icon(
-                      onPressed: () => downloadTeacherPdfAttachment(
-                        context,
-                        primaryUrl,
-                        _mediaFileName(lesson, primaryUrl),
-                      ),
-                      icon: const Icon(Icons.download_outlined, size: 18),
-                      label: Text(lang.t('lessons.downloadPDF')),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                ],
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton.icon(
