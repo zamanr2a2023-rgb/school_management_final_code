@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:high_school/core/constants/app_constants.dart';
 import 'package:high_school/core/network/api_response_helper.dart';
 import 'package:high_school/core/utils/app_date_format.dart';
+import 'package:high_school/core/utils/lesson_entity_json_parser.dart';
 import 'package:high_school/data/datasources/live_session_json_parser.dart';
 import 'package:high_school/domain/entities/assignment_entity.dart';
 import 'package:high_school/domain/entities/class_entity.dart';
@@ -184,60 +185,7 @@ class StudentClassesRemoteDatasource {
   }
 
   static LessonEntity? _lessonFromJson(Map<String, dynamic> m, String fallbackClassId) {
-    final id = m['_id']?.toString() ?? m['id']?.toString();
-    if (id == null || id.isEmpty) return null;
-    final classId = m['classId']?.toString() ?? fallbackClassId;
-    final title = m['title']?.toString() ?? '';
-    final description = m['description']?.toString() ?? '';
-    final ct = (m['contentType'] ?? m['type'])?.toString().toLowerCase() ?? 'text';
-    LessonType type = LessonType.text;
-    if (ct.contains('video')) {
-      type = LessonType.video;
-    } else if (ct.contains('pdf')) {
-      type = LessonType.pdf;
-    }
-    var content = m['content']?.toString() ?? '';
-    if (content.isEmpty) {
-      content = m['videoUrl']?.toString() ?? m['video']?.toString() ?? '';
-    }
-    if (content.isEmpty && m['files'] is List && (m['files'] as List).isNotEmpty) {
-      final f = (m['files'] as List).first;
-      if (f is Map) {
-        content = f['url']?.toString() ?? f['path']?.toString() ?? '';
-      }
-    }
-    var dateStr = m['date']?.toString() ?? '';
-    if (dateStr.isEmpty) {
-      final created = m['createdAt']?.toString();
-      if (created != null && created.length >= 10) dateStr = created.substring(0, 10);
-    }
-    final duration = m['duration']?.toString();
-    final statusStr = (m['status']?.toString() ?? 'published').toLowerCase();
-    final status = statusStr == 'draft' ? LessonStatus.draft : LessonStatus.published;
-    var lastUpdated = m['updatedAt']?.toString() ?? m['lastUpdated']?.toString() ?? m['createdAt']?.toString() ?? '';
-    if (lastUpdated.length >= 10) lastUpdated = lastUpdated.substring(0, 10);
-    if (lastUpdated.isEmpty) lastUpdated = dateStr;
-    final module = m['chapter']?.toString() ?? m['module']?.toString();
-    final createdByRole = (m['createdBy'] is Map
-            ? (m['createdBy'] as Map)['role']
-            : m['createdByRole'])
-        ?.toString()
-        .toLowerCase();
-    final uploadedByAdmin = m['uploadedByAdmin'] == true || createdByRole == 'admin';
-    return LessonEntity(
-      id: id,
-      classId: classId,
-      title: title.isEmpty ? 'Lesson' : title,
-      description: description,
-      type: type,
-      content: content,
-      date: dateStr,
-      duration: duration,
-      status: status,
-      lastUpdated: lastUpdated.isEmpty ? dateStr : lastUpdated,
-      module: module,
-      uploadedByAdmin: uploadedByAdmin,
-    );
+    return LessonEntityJsonParser.parse(m, fallbackClassId);
   }
 
   static List<AssignmentEntity> _parseAssignmentDetails(dynamic raw, String fallbackClassId) {

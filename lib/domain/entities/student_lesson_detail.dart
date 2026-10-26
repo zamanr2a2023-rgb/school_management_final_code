@@ -1,3 +1,4 @@
+import 'package:high_school/core/utils/lesson_entity_json_parser.dart';
 import 'package:high_school/domain/entities/lesson_entity.dart';
 
 /// Payload from GET /api/v1/lesson/:lessonId (student).
@@ -34,14 +35,12 @@ class StudentLessonDetail {
   final String? duration;
 
   LessonType get lessonType {
-    switch (contentTypeRaw.toLowerCase()) {
-      case 'video':
-        return LessonType.video;
-      case 'pdf':
-        return LessonType.pdf;
-      default:
-        return LessonType.text;
-    }
+    final firstUrl = fileUrls.isNotEmpty ? fileUrls.first : null;
+    return LessonEntityJsonParser.inferLessonType(
+      contentTypeRaw: contentTypeRaw,
+      url: firstUrl,
+      name: firstUrl,
+    );
   }
 
   LessonStatus get lessonStatus =>

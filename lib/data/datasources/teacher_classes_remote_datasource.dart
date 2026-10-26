@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:high_school/core/constants/app_constants.dart';
 import 'package:high_school/core/network/api_response_helper.dart';
 import 'package:high_school/core/utils/app_date_format.dart';
+import 'package:high_school/core/utils/lesson_entity_json_parser.dart';
 import 'package:high_school/domain/entities/assignment_entity.dart';
 import 'package:high_school/domain/entities/class_entity.dart';
 import 'package:high_school/domain/entities/lesson_entity.dart';
@@ -204,108 +205,7 @@ class TeacherClassesRemoteDatasource {
   }
 
   LessonEntity? _lessonFromJson(Map<String, dynamic> m, String fallbackClassId) {
-    final id = m['_id']?.toString() ?? m['id']?.toString();
-    if (id == null || id.isEmpty) return null;
-    var classId = m['classId']?.toString() ?? '';
-    if (classId.isEmpty) classId = fallbackClassId;
-    final title = m['title']?.toString() ?? '';
-    final description = m['description']?.toString() ?? '';
-    final ct = (m['contentType'] ?? m['type'])?.toString().toLowerCase() ?? 'text';
-    LessonType type = LessonType.text;
-    if (ct.contains('video')) {
-      type = LessonType.video;
-    } else if (ct.contains('pdf')) {
-      type = LessonType.pdf;
-    }
-    var content = m['content']?.toString() ?? '';
-    if (content.isEmpty) {
-      content = m['videoUrl']?.toString() ?? m['video']?.toString() ?? '';
-    }
-    if (content.isEmpty && m['files'] is List && (m['files'] as List).isNotEmpty) {
-      final f = (m['files'] as List).first;
-      if (f is Map) {
-        content = f['url']?.toString() ?? f['path']?.toString() ?? '';
-      }
-    }
-    String? attachmentMime;
-    String? attachmentName;
-    final firstAtt = _firstAttachmentMap(m);
-    if (firstAtt != null) {
-      if (content.isEmpty) content = firstAtt['url'] ?? '';
-      attachmentMime = firstAtt['mime'];
-      attachmentName = firstAtt['name'];
-      final mimeLower = attachmentMime?.toLowerCase() ?? '';
-      final nameLower = (attachmentName ?? '').toLowerCase();
-      final isImage = mimeLower.startsWith('image/') ||
-          nameLower.endsWith('.jpg') ||
-          nameLower.endsWith('.jpeg') ||
-          nameLower.endsWith('.png') ||
-          nameLower.endsWith('.gif') ||
-          nameLower.endsWith('.webp') ||
-          nameLower.endsWith('.bmp') ||
-          nameLower.endsWith('.heic');
-      if (mimeLower.contains('video')) {
-        type = LessonType.video;
-      } else if (mimeLower.contains('pdf') && !isImage) {
-        type = LessonType.pdf;
-      } else if (isImage && type == LessonType.text) {
-        // File lessons are often stored as contentType=pdf; keep as pdf slot but
-        // UI routes by mime/name. Prefer pdf type so the media row is shown.
-        type = LessonType.pdf;
-      }
-    }
-    if (content.isNotEmpty && !content.startsWith('http://') && !content.startsWith('https://')) {
-      content = _resolveAssetUrl(content);
-    }
-    var dateStr = m['date']?.toString() ?? '';
-    if (dateStr.isEmpty) {
-      final created = m['createdAt']?.toString();
-      if (created != null && created.length >= 10) dateStr = created.substring(0, 10);
-    }
-    final duration = m['duration']?.toString();
-    final statusStr = (m['status']?.toString() ?? 'published').toLowerCase();
-    final status = statusStr == 'draft' ? LessonStatus.draft : LessonStatus.published;
-    var lastUpdated = m['updatedAt']?.toString() ?? m['lastUpdated']?.toString() ?? m['createdAt']?.toString() ?? '';
-    if (lastUpdated.length >= 10) lastUpdated = lastUpdated.substring(0, 10);
-    if (lastUpdated.isEmpty) lastUpdated = dateStr;
-    final module = m['chapter']?.toString() ?? m['module']?.toString();
-    final createdByRole = (m['createdBy'] is Map
-            ? (m['createdBy'] as Map)['role']
-            : m['createdByRole'])
-        ?.toString()
-        .toLowerCase();
-    final uploadedByAdmin = m['uploadedByAdmin'] == true || createdByRole == 'admin';
-    return LessonEntity(
-      id: id,
-      classId: classId,
-      title: title.isEmpty ? 'Lesson' : title,
-      description: description,
-      type: type,
-      content: content,
-      date: dateStr,
-      duration: duration,
-      status: status,
-      lastUpdated: lastUpdated.isEmpty ? dateStr : lastUpdated,
-      module: module,
-      attachmentMimeType: attachmentMime,
-      attachmentName: attachmentName,
-      uploadedByAdmin: uploadedByAdmin,
-    );
-  }
-
-  static Map<String, String>? _firstAttachmentMap(Map<String, dynamic> m) {
-    final raw = m['attachments'];
-    if (raw is! List || raw.isEmpty) return null;
-    final first = raw.first;
-    if (first is! Map) return null;
-    final fm = Map<String, dynamic>.from(first);
-    final url = fm['url']?.toString() ?? '';
-    if (url.isEmpty) return null;
-    return {
-      'url': url,
-      'mime': fm['mimeType']?.toString() ?? '',
-      'name': fm['originalName']?.toString() ?? 'file',
-    };
+    return LessonEntityJsonParser.parse(m, fallbackClassId, resolveAssetUrl: _resolveAssetUrl);
   }
 
   static List<AssignmentAttachmentEntity> _parseAttachments(dynamic raw) {
