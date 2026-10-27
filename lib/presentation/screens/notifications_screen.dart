@@ -36,7 +36,12 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
 
     final list = _list!;
 
-    return Column(
+    return RefreshIndicator(
+      onRefresh: _load,
+      child: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.only(bottom: 24),
+        child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         // Page heading – match React (text-xl font-semibold)
@@ -56,7 +61,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
             child: TextButton(
               onPressed: () async {
                 await context.read<NotificationsRepository>().markAllAsRead();
-                setState(() {});
+                await _load();
               },
               child: Text(lang.t('notifications.markAllRead')),
             ),
@@ -67,7 +72,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                 lang: lang,
                 onTap: () async {
                   await context.read<NotificationsRepository>().markAsRead(n.id);
-                  setState(() {});
+                  await _load();
                 },
               )),
         ] else
@@ -84,6 +89,8 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
             ),
           ),
       ],
+        ),
+      ),
     );
   }
 }
@@ -96,6 +103,8 @@ Color _avatarColor(NotificationType type) {
       return AppTheme.accent;
     case NotificationType.system:
       return AppTheme.secondary;
+    case NotificationType.chat:
+      return AppTheme.primary;
   }
 }
 
