@@ -49,6 +49,12 @@ class ClassChatRepositoryImpl implements ClassChatRepository {
   }
 
   @override
+  Stream<ClassChatMessageEntity> watchInAppAlerts() {
+    _socket.ensureConnected();
+    return _socket.inAppNotifications.map((e) => e.message);
+  }
+
+  @override
   Stream<String> watchDeletedMessageIds(String classId) {
     _socket.connectAndJoin(classId);
     return _socket.deletedMessages

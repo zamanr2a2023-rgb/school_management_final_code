@@ -37,6 +37,8 @@ class ClassChatBadgeButton extends StatefulWidget {
 
 class _ClassChatBadgeButtonState extends State<ClassChatBadgeButton> {
   StreamSubscription<ClassChatMessageEntity>? _socketSub;
+  StreamSubscription<ClassChatMessageEntity>? _alertSub;
+  final Set<String> _seenMessageIds = {};
   int _unread = 0;
   bool _loading = true;
 
@@ -61,11 +63,17 @@ class _ClassChatBadgeButtonState extends State<ClassChatBadgeButton> {
     }
 
     await _socketSub?.cancel();
+    await _alertSub?.cancel();
     _socketSub = repo.watchMessages(widget.classId).listen(_onIncoming);
+    _alertSub = repo.watchInAppAlerts().listen(_onIncoming);
   }
 
   void _onIncoming(ClassChatMessageEntity msg) {
     if (msg.classId != widget.classId) return;
+    if (msg.id.isNotEmpty) {
+      if (_seenMessageIds.contains(msg.id)) return;
+      _seenMessageIds.add(msg.id);
+    }
     final myId = context.read<AuthProvider>().user?.id ?? '';
     if (myId.isNotEmpty && msg.senderId == myId) return;
     if (!mounted) return;
@@ -90,6 +98,7 @@ class _ClassChatBadgeButtonState extends State<ClassChatBadgeButton> {
   @override
   void dispose() {
     _socketSub?.cancel();
+    _alertSub?.cancel();
     super.dispose();
   }
 

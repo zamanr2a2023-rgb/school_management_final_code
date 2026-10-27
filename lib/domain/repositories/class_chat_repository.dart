@@ -24,6 +24,9 @@ abstract class ClassChatRepository {
   /// Connects socket (if needed), joins class room, and streams new messages.
   Stream<ClassChatMessageEntity> watchMessages(String classId);
 
+  /// User-room alerts (`classChat:notify`) — works without joining the class room.
+  Stream<ClassChatMessageEntity> watchInAppAlerts();
+
   /// Streams message ids removed via moderation (realtime).
   Stream<String> watchDeletedMessageIds(String classId);
 
