@@ -11,8 +11,14 @@ class ClassChatSocketClient {
   final SharedPreferences _prefs;
   io.Socket? _socket;
   final _controller = StreamController<ClassChatMessageEntity>.broadcast();
+  final _inAppNotifyController =
+      StreamController<ClassChatInAppNotifyEvent>.broadcast();
   final _deletedController = StreamController<({String classId, String id})>.broadcast();
   String? _joinedClassId;
+
+  /// Realtime in-app alert while the user is anywhere in the app (user socket room).
+  Stream<ClassChatInAppNotifyEvent> get inAppNotifications =>
+      _inAppNotifyController.stream;
 
   Stream<ClassChatMessageEntity> get messages => _controller.stream;
 
@@ -27,14 +33,14 @@ class ClassChatSocketClient {
 
   String? get _token => _prefs.getString(AppConstants.sessionTokenKey);
 
-  Future<void> connectAndJoin(String classId) async {
+  /// Connect socket (joins user room on server) for global in-app chat alerts.
+  Future<void> ensureConnected() async {
     final url = _socketUrl;
     final token = _token;
-    if (url.isEmpty || token == null || token.isEmpty || classId.isEmpty) return;
+    if (url.isEmpty || token == null || token.isEmpty) return;
 
     if (_socket == null) {
-      _joinedClassId = classId;
-      _socket = io.io(
+      _attachSocket(io.io(
         url,
         io.OptionBuilder()
             .setTransports(['websocket'])
@@ -42,46 +48,72 @@ class ClassChatSocketClient {
             .setAuth({'token': token})
             .setExtraHeaders({'Authorization': 'Bearer $token'})
             .build(),
-      );
+      ));
+    }
 
-      _socket!.onConnect((_) {
-        final joinId = _joinedClassId;
-        if (joinId != null && joinId.isNotEmpty) _emitJoin(joinId);
-      });
-
-      _socket!.on('classChat:newMessage', (data) {
-        try {
-          final map = _asMessageMap(data);
-          if (map == null) return;
-          final msg = ClassChatMessageEntity.fromJson(map);
-          if (msg.id.isEmpty || msg.text.isEmpty) return;
-          if (!_controller.isClosed) _controller.add(msg);
-        } catch (_) {}
-      });
-
-      _socket!.on('classChat:messageDeleted', (data) {
-        try {
-          final map = _asMessageMap(data);
-          if (map == null) return;
-          final id = (map['id'] ?? map['messageId'] ?? '').toString();
-          final cid = (map['classId'] ?? '').toString();
-          if (id.isEmpty) return;
-          if (!_deletedController.isClosed) {
-            _deletedController.add((classId: cid, id: id));
-          }
-        } catch (_) {}
-      });
-
+    if (!_socket!.connected) {
       _socket!.connect();
-    } else if (_socket!.connected) {
+    }
+  }
+
+  Future<void> connectAndJoin(String classId) async {
+    if (classId.isEmpty) return;
+    await ensureConnected();
+    if (_socket!.connected) {
       if (_joinedClassId != null && _joinedClassId != classId) {
         _socket!.emit('classChat:leave', {'classId': _joinedClassId});
       }
       _emitJoin(classId);
     } else {
       _joinedClassId = classId;
-      _socket!.connect();
     }
+  }
+
+  void _attachSocket(io.Socket socket) {
+    _socket = socket;
+
+    _socket!.onConnect((_) {
+      final joinId = _joinedClassId;
+      if (joinId != null && joinId.isNotEmpty) _emitJoin(joinId);
+    });
+
+    _socket!.on('classChat:newMessage', (data) {
+      try {
+        final map = _asMessageMap(data);
+        if (map == null) return;
+        final msg = ClassChatMessageEntity.fromJson(map);
+        if (msg.id.isEmpty || msg.text.isEmpty) return;
+        if (!_controller.isClosed) _controller.add(msg);
+      } catch (_) {}
+    });
+
+    _socket!.on('classChat:notify', (data) {
+      try {
+        final map = _asMessageMap(data);
+        if (map == null) return;
+        final msg = ClassChatMessageEntity.fromJson(map);
+        if (msg.id.isEmpty || msg.text.isEmpty) return;
+        final className = (map['className'] ?? '').toString().trim();
+        if (!_inAppNotifyController.isClosed) {
+          _inAppNotifyController.add(
+            ClassChatInAppNotifyEvent(message: msg, className: className),
+          );
+        }
+      } catch (_) {}
+    });
+
+    _socket!.on('classChat:messageDeleted', (data) {
+      try {
+        final map = _asMessageMap(data);
+        if (map == null) return;
+        final id = (map['id'] ?? map['messageId'] ?? '').toString();
+        final cid = (map['classId'] ?? '').toString();
+        if (id.isEmpty) return;
+        if (!_deletedController.isClosed) {
+          _deletedController.add((classId: cid, id: id));
+        }
+      } catch (_) {}
+    });
   }
 
   void _emitJoin(String classId) {
@@ -127,6 +159,17 @@ class ClassChatSocketClient {
   Future<void> dispose() async {
     await disconnect();
     await _controller.close();
+    await _inAppNotifyController.close();
     await _deletedController.close();
   }
+}
+
+class ClassChatInAppNotifyEvent {
+  const ClassChatInAppNotifyEvent({
+    required this.message,
+    required this.className,
+  });
+
+  final ClassChatMessageEntity message;
+  final String className;
 }

@@ -115,10 +115,11 @@ class PushNotificationService {
     );
 
     if (!kIsWeb && Platform.isAndroid) {
-      await _local
+      final androidPlugin = _local
           .resolvePlatformSpecificImplementation<
-              AndroidFlutterLocalNotificationsPlugin>()
-          ?.createNotificationChannel(_androidChannel);
+              AndroidFlutterLocalNotificationsPlugin>();
+      await androidPlugin?.requestNotificationsPermission();
+      await androidPlugin?.createNotificationChannel(_androidChannel);
     }
   }
 
@@ -174,6 +175,7 @@ class PushNotificationService {
 
     final viewingThisChat =
         activeClassChatId != null && activeClassChatId == classId;
+    if (viewingThisChat) return;
 
     await HapticFeedback.mediumImpact();
     await _showLocal(
@@ -181,8 +183,7 @@ class PushNotificationService {
       body: body,
       classId: classId,
       messageId: messageId ?? '',
-      // Brief banner while already in the chat; full sticky when elsewhere.
-      timeoutAfterMs: (playSoundOnly || viewingThisChat) ? 2500 : null,
+      timeoutAfterMs: playSoundOnly ? 2500 : null,
     );
   }
 
