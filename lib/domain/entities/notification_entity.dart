@@ -9,7 +9,7 @@ class NotificationEntity {
   final bool read;
   final DateTime sortKey;
 
-  const NotificationEntity({
+  NotificationEntity({
     required this.id,
     required this.type,
     required this.from,
