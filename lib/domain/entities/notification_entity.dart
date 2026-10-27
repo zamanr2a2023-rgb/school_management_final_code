@@ -1,4 +1,4 @@
-enum NotificationType { student, admin, system }
+enum NotificationType { student, admin, system, chat }
 
 class NotificationEntity {
   final String id;
@@ -7,6 +7,7 @@ class NotificationEntity {
   final String message;
   final String timestamp;
   final bool read;
+  final DateTime sortKey;
 
   const NotificationEntity({
     required this.id,
@@ -15,5 +16,6 @@ class NotificationEntity {
     required this.message,
     required this.timestamp,
     required this.read,
-  });
+    DateTime? sortKey,
+  }) : sortKey = sortKey ?? DateTime.fromMillisecondsSinceEpoch(0);
 }

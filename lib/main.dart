@@ -89,7 +89,7 @@ void main() async {
     studentDashboard: studentDashboardRepo,
   );
   final NotificationsRepository notificationsRepo =
-      NotificationsRepositoryImpl();
+      NotificationsRepositoryImpl(prefs);
   final SubscriptionRepository subscriptionRepo =
       SubscriptionRepositoryImpl(prefs);
   final SubjectsRepository subjectsRepo = SubjectsRepositoryImpl(prefs);
@@ -144,6 +144,7 @@ void main() async {
     classChatSocketClient,
     pushService,
     authProvider,
+    notificationsRepo,
   );
 
   authProvider.addListener(() {

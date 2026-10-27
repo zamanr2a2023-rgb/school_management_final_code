@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:high_school/core/services/push_notification_service.dart';
 import 'package:high_school/data/datasources/class_chat_socket_client.dart';
+import 'package:high_school/domain/repositories/notifications_repository.dart';
 import 'package:high_school/presentation/providers/auth_provider.dart';
 
 /// Listens for `classChat:notify` on the user socket room and shows
@@ -12,11 +13,13 @@ class ClassChatInAppService {
     this._socket,
     this._push,
     this._auth,
+    this._notifications,
   );
 
   final ClassChatSocketClient _socket;
   final PushNotificationService _push;
   final AuthProvider _auth;
+  final NotificationsRepository _notifications;
 
   StreamSubscription<ClassChatInAppNotifyEvent>? _notifySub;
   final Set<String> _recentMessageKeys = {};
@@ -64,6 +67,13 @@ class ClassChatInAppService {
         ? event.className
         : (msg.classId.isNotEmpty ? 'Class Chat' : 'New message');
     final body = '${msg.senderName}: ${msg.text}';
+
+    await _notifications.recordClassChatNotification(
+      classId: msg.classId,
+      title: title,
+      body: body,
+      messageId: msg.id,
+    );
 
     await _push.notifyClassChatMessage(
       classId: msg.classId,
