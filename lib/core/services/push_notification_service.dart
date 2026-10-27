@@ -65,6 +65,12 @@ class PushNotificationService {
         announcement: true,
       );
 
+      await messaging.setForegroundNotificationPresentationOptions(
+        alert: true,
+        badge: true,
+        sound: true,
+      );
+
       FirebaseMessaging.onMessage.listen(_showForeground);
       FirebaseMessaging.onMessageOpenedApp.listen(_handleRemoteOpen);
 
@@ -120,6 +126,17 @@ class PushNotificationService {
               AndroidFlutterLocalNotificationsPlugin>();
       await androidPlugin?.requestNotificationsPermission();
       await androidPlugin?.createNotificationChannel(_androidChannel);
+    }
+
+    if (!kIsWeb && Platform.isIOS) {
+      final iosPlugin = _local.resolvePlatformSpecificImplementation<
+          IOSFlutterLocalNotificationsPlugin>();
+      final granted = await iosPlugin?.requestPermissions(
+        alert: true,
+        badge: true,
+        sound: true,
+      );
+      debugPrint('[push] iOS notification permissions granted: $granted');
     }
   }
 

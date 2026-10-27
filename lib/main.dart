@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:intl/date_symbol_data_local.dart';
@@ -138,17 +140,11 @@ void main() async {
     }
   };
 
-  await pushService.init();
   final classChatInAppService = ClassChatInAppService(
     classChatSocketClient,
     pushService,
     authProvider,
   );
-  classChatInAppService.start();
-
-  if (authProvider.isAuthenticated) {
-    await pushService.syncTokenWithBackend();
-  }
 
   authProvider.addListener(() {
     if (authProvider.isAuthenticated) {
@@ -214,4 +210,21 @@ void main() async {
       ),
     ),
   );
+
+  // After first frame so iOS debug can attach the Dart VM service quickly.
+  WidgetsBinding.instance.addPostFrameCallback((_) {
+    unawaited(_bootstrapPushAndChat(pushService, classChatInAppService, authProvider));
+  });
+}
+
+Future<void> _bootstrapPushAndChat(
+  PushNotificationService pushService,
+  ClassChatInAppService classChatInAppService,
+  AuthProvider authProvider,
+) async {
+  await pushService.init();
+  classChatInAppService.start();
+  if (authProvider.isAuthenticated) {
+    await pushService.syncTokenWithBackend();
+  }
 }
