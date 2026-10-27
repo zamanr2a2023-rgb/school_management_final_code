@@ -32,6 +32,7 @@ import 'package:high_school/data/repositories/class_chat_repository_impl.dart';
 import 'package:high_school/data/datasources/class_chat_remote_datasource.dart';
 import 'package:high_school/data/datasources/class_chat_socket_client.dart';
 import 'package:high_school/core/services/push_notification_service.dart';
+import 'package:high_school/core/services/class_chat_in_app_service.dart';
 import 'package:high_school/domain/entities/user_entity.dart';
 import 'package:high_school/data/repositories/classes_repository_impl.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
@@ -138,6 +139,13 @@ void main() async {
   };
 
   await pushService.init();
+  final classChatInAppService = ClassChatInAppService(
+    classChatSocketClient,
+    pushService,
+    authProvider,
+  );
+  classChatInAppService.start();
+
   if (authProvider.isAuthenticated) {
     await pushService.syncTokenWithBackend();
   }

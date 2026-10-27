@@ -134,20 +134,6 @@ class _ClassChatScreenState extends State<ClassChatScreen> {
     });
     _scrollToBottom();
 
-    // In-app sound for others' messages when notifications are unmuted.
-    if (!wasReplace && !_muted) {
-      final myId = context.read<AuthProvider>().user?.id ?? '';
-      if (myId.isNotEmpty && msg.senderId != myId) {
-        _push?.notifyClassChatMessage(
-          classId: msg.classId,
-          title: _title?.isNotEmpty == true ? _title! : 'Class Chat',
-          body: '${msg.senderName}: ${msg.text}',
-          messageId: msg.id,
-          playSoundOnly: true,
-        );
-      }
-    }
-
     // Keep unread cursor current while the chat is open.
     if (!wasReplace) {
       unawaited(_repo?.markAsRead(widget.classId) ?? Future.value());
